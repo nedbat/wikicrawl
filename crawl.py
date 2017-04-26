@@ -1,4 +1,6 @@
 import itertools
+import os
+import os.path
 import pprint
 import re
 import sys
@@ -202,6 +204,15 @@ def write_page(writer, page, parent_restricted=False):
 
     return num_restricted
 
+
+def open_for_writing(path):
+    """Open a file for writing, including creating dirs as needed."""
+    dirname, filename = os.path.split(path)
+    if dirname and not os.path.isdir(dirname):
+        os.makedirs(dirname)
+    return open(path, "w")
+
+
 STYLE = """
 .restricted { background: #ffcccc; }
 .parent_restricted { background: #ffff44; }
@@ -209,7 +220,7 @@ STYLE = """
 
 def generate_space_page(space):
     space.fetch_pages()
-    with open(f"pages_{space.key}.html", "w") as fout:
+    with open_for_writing(f"html/pages_{space.key}.html") as fout:
         writer = HtmlOutlineWriter(fout, style=STYLE)
         writer.write(html="<h1>")
         writer.write(text=space.key)
@@ -231,7 +242,7 @@ def generate_all_space_pages():
     api_spaces = get_api_spaces()
     spaces = [Space(s) for s in api_spaces]
     spaces.sort(key=lambda s: s.key)
-    with open("spaces.html", "w") as fout:
+    with open_for_writing("html/spaces.html") as fout:
         total_pages = 0
         total_restricted = 0
         total_posts = 0
