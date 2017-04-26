@@ -3,13 +3,12 @@ import pprint
 import re
 import sys
 
-import keys
-
+import click
 from PythonConfluenceAPI import ConfluenceAPI
 
+import keys
 from htmlwriter import HtmlOutlineWriter, prep_html
 
-pp = pprint.pprint
 
 api = ConfluenceAPI(keys.USER, keys.PASSWORD, keys.SITE)
 
@@ -286,9 +285,20 @@ PERM_SHORTHANDS = {
     (True, False): "???",
 }
 
-if __name__ == "__main__":
-    space_key = sys.argv[1]
-    if space_key == 'all':
+@click.command()
+@click.option('--all', 'all_spaces', is_flag=True)
+@click.argument('space_keys', nargs=-1)
+def main(all_spaces, space_keys):
+    if all_spaces:
+        if space_keys:
+            click.echo("Can't specify space keys with --all")
+            return
         generate_all_space_pages()
+    elif space_keys:
+        for space_key in space_keys:
+            generate_space_page(Space(key=space_key))
     else:
-        generate_space_page(Space(key=space_key))
+        click.echo("Nothing to do!")
+
+if __name__ == "__main__":
+    main()
