@@ -315,10 +315,10 @@ PERM_SHORTHANDS = {
     (True, False): "???",
 }
 
-@click.command()
-@click.option('--all', 'all_spaces', is_flag=True)
-@click.option('--pages/--no-pages', default=True)
-@click.option('--htmldir', default='html')
+@click.command(help="Examine a Confluence wiki and produce an HTML report on spaces and permissions")
+@click.option('--all', 'all_spaces', is_flag=True, help="Examine all spaces")
+@click.option('--pages/--no-pages', default=True, help="Examine the page trees")
+@click.option('--htmldir', default='html', metavar="DIR", help="Directory to get the HTML results")
 @click.argument('space_keys', nargs=-1)
 def main(all_spaces, pages, htmldir, space_keys):
     if all_spaces:
