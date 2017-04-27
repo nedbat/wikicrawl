@@ -3,7 +3,6 @@ import os
 import os.path
 import pprint
 import re
-import sys
 
 import click
 from PythonConfluenceAPI import ConfluenceAPI
@@ -84,15 +83,17 @@ class Space:
 
         self.blog_posts = list(map(Page, get_api_pages(self.key, type='blogpost')))
 
-        for page in count_off(self.pages):
-            page.fetch_restrictions()
-            if page.parent_id:
-                try:
-                    page.parent = self.pages_by_id[page.parent_id]
-                except:
-                    print(f"No parent for {page}")
-                else:
-                    page.parent.children.append(page)
+        bar_label = "Reading pages from {}".format(self.key)
+        with click.progressbar(self.pages, label=bar_label, show_pos=True) as bar:
+            for page in bar:
+                page.fetch_restrictions()
+                if page.parent_id:
+                    try:
+                        page.parent = self.pages_by_id[page.parent_id]
+                    except:
+                        print(f"No parent for {page}")
+                    else:
+                        page.parent.children.append(page)
 
     def fetch_permissions(self):
         if self.permissions is not None:
@@ -155,18 +156,6 @@ def get_api_spaces():
             break
         yield from spaces['results']
         start = spaces['start'] + spaces['size']
-
-
-def count_off(seq):
-    i = -1
-    for i, thing in enumerate(seq):
-        print(".", end="")
-        sys.stdout.flush()
-        if i % 100 == 99:
-            print(i+1)
-        yield thing
-    if i > -1:
-        print(i+1)
 
 
 def write_page(writer, page, parent_restricted=False):
