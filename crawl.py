@@ -286,7 +286,7 @@ def generate_all_space_pages(do_pages, html_dir='html'):
             title = space.key
             if space.name:
                 title += ": " + space.name
-            title = prep_html(text=title, href=f"pages_{space.key}.html")
+            title = prep_html(text=title, href=f"pages_{space.key}.html" if do_pages else None)
             writer.write(html=f"<td>{title}")
             if do_pages:
                 writer.write(html=f"<td class='right'>{len(space.pages)}")
