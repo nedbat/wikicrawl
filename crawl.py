@@ -125,7 +125,7 @@ class Space:
         self.fetch_permissions()
         count = collections.Counter()
         count.update(name_for_permission(p) for p in self.permissions if 'operation' not in p)
-        return sorted((item for item in count.items() if item[1] > 1), key=lambda item: item[1], reverse=True)
+        return sorted((item for item in count.items() if item[1] > 2), key=lambda item: item[1], reverse=True)
 
 
 def permission_is_read_space(p):
