@@ -226,8 +226,7 @@ def generate_space_page(space):
             writer.end_section()
     return num_restricted
 
-def generate_all_space_pages():
-    DO_PAGES = True
+def generate_all_space_pages(do_pages):
     api_spaces = get_api_spaces()
     spaces = [Space(s) for s in api_spaces]
     spaces.sort(key=lambda s: s.key)
@@ -248,7 +247,7 @@ def generate_all_space_pages():
         writer.write(html="<table>")
         writer.write(html="<tr><th>Space<th class='right'>Pages<th class='right'>Restricted<th class='right'>Blog Posts<th>Anon<th>Logged-in<th>Summary</tr>")
         for space in spaces:
-            if DO_PAGES:
+            if do_pages:
                 num_restricted = generate_space_page(space)
 
             writer.write("<tr>")
@@ -257,7 +256,7 @@ def generate_all_space_pages():
                 title += ": " + space.name
             title = prep_html(text=title, href=f"pages_{space.key}.html")
             writer.write(html=f"<td>{title}")
-            if DO_PAGES:
+            if do_pages:
                 writer.write(html=f"<td class='right'>{len(space.pages)}")
                 writer.write(html=f"<td class='right'>{num_restricted}")
                 writer.write(html=f"<td class='right'>{len(space.blog_posts)}")
@@ -271,7 +270,7 @@ def generate_all_space_pages():
             writer.write(html=f"<td>{logged}")
             writer.write(html=f"<td>{PERM_SHORTHANDS[(anon, logged)]}")
             writer.write("</tr>\n")
-            if DO_PAGES:
+            if do_pages:
                 total_pages += len(space.pages)
                 total_restricted += num_restricted
                 total_posts += len(space.blog_posts)
@@ -287,13 +286,14 @@ PERM_SHORTHANDS = {
 
 @click.command()
 @click.option('--all', 'all_spaces', is_flag=True)
+@click.option('--pages/--no-pages', default=True)
 @click.argument('space_keys', nargs=-1)
-def main(all_spaces, space_keys):
+def main(all_spaces, pages, space_keys):
     if all_spaces:
         if space_keys:
             click.echo("Can't specify space keys with --all")
             return
-        generate_all_space_pages()
+        generate_all_space_pages(pages)
     elif space_keys:
         for space_key in space_keys:
             generate_space_page(Space(key=space_key))
