@@ -207,9 +207,9 @@ STYLE = """
 .parent_restricted { background: #ffff44; }
 """
 
-def generate_space_page(space):
+def generate_space_page(space, html_dir='html'):
     space.fetch_pages()
-    with open_for_writing(f"html/pages_{space.key}.html") as fout:
+    with open_for_writing(f"{html_dir}/pages_{space.key}.html") as fout:
         writer = HtmlOutlineWriter(fout, style=STYLE)
         writer.write(html="<h1>")
         writer.write(text=space.key)
@@ -226,11 +226,11 @@ def generate_space_page(space):
             writer.end_section()
     return num_restricted
 
-def generate_all_space_pages(do_pages):
+def generate_all_space_pages(do_pages, html_dir='html'):
     api_spaces = get_api_spaces()
     spaces = [Space(s) for s in api_spaces]
     spaces.sort(key=lambda s: s.key)
-    with open_for_writing("html/spaces.html") as fout:
+    with open_for_writing(f"{html_dir}/spaces.html") as fout:
         total_pages = 0
         total_restricted = 0
         total_posts = 0
@@ -245,7 +245,10 @@ def generate_all_space_pages(do_pages):
             """
         )
         writer.write(html="<table>")
-        writer.write(html="<tr><th>Space<th class='right'>Pages<th class='right'>Restricted<th class='right'>Blog Posts<th>Anon<th>Logged-in<th>Summary</tr>")
+        writer.write(html="<tr><th>Space")
+        if do_pages:
+            writer.write(html="<th class='right'>Pages<th class='right'>Restricted<th class='right'>Blog Posts")
+        writer.write(html="<th>Anon<th>Logged-in<th>Summary</tr>")
         for space in spaces:
             if do_pages:
                 num_restricted = generate_space_page(space)
@@ -260,10 +263,6 @@ def generate_all_space_pages(do_pages):
                 writer.write(html=f"<td class='right'>{len(space.pages)}")
                 writer.write(html=f"<td class='right'>{num_restricted}")
                 writer.write(html=f"<td class='right'>{len(space.blog_posts)}")
-            else:
-                writer.write(html=f"<td class='right'>0")
-                writer.write(html=f"<td class='right'>0")
-                writer.write(html=f"<td class='right'>0")
             anon = space.has_anonymous_read()
             logged = space.has_loggedin_read()
             writer.write(html=f"<td>{anon}")
@@ -274,7 +273,8 @@ def generate_all_space_pages(do_pages):
                 total_pages += len(space.pages)
                 total_restricted += num_restricted
                 total_posts += len(space.blog_posts)
-        writer.write(html=f"<tr><td>TOTAL <td class='right'>{total_pages}<td class='right'>{total_restricted}<td class='right'>{total_posts}</tr>")
+        if do_pages:
+            writer.write(html=f"<tr><td>TOTAL <td class='right'>{total_pages}<td class='right'>{total_restricted}<td class='right'>{total_posts}</tr>")
         writer.write(html="</table>")
 
 PERM_SHORTHANDS = {
@@ -287,16 +287,17 @@ PERM_SHORTHANDS = {
 @click.command()
 @click.option('--all', 'all_spaces', is_flag=True)
 @click.option('--pages/--no-pages', default=True)
+@click.option('--htmldir', default='html')
 @click.argument('space_keys', nargs=-1)
-def main(all_spaces, pages, space_keys):
+def main(all_spaces, pages, htmldir, space_keys):
     if all_spaces:
         if space_keys:
             click.echo("Can't specify space keys with --all")
             return
-        generate_all_space_pages(pages)
+        generate_all_space_pages(do_pages=pages, html_dir=htmldir)
     elif space_keys:
         for space_key in space_keys:
-            generate_space_page(Space(key=space_key))
+            generate_space_page(Space(key=space_key), html_dir=htmldir)
     else:
         click.echo("Nothing to do!")
 
