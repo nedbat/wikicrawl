@@ -1,4 +1,5 @@
 import collections
+import contextlib
 import itertools
 import os
 import os.path
@@ -6,6 +7,7 @@ import pprint
 import re
 
 import click
+import requests.exceptions
 from PythonConfluenceAPI import ConfluenceAPI
 
 import keys
@@ -41,7 +43,8 @@ class Page:
         return scrub_title(self.title) < scrub_title(other.title)
 
     def fetch_restrictions(self):
-        restrictions = api.get_op_restrictions_for_content_id(self.id)
+        with report_http_errors():
+            restrictions = api.get_op_restrictions_for_content_id(self.id)
         read_res = restrictions['read']['restrictions']
         groups = [gr['name'] for gr in read_res['group']['results']]
         users = [ur['username'] for ur in read_res['user']['results']]
@@ -102,7 +105,8 @@ class Space:
     def fetch_permissions(self):
         if self.permissions is not None:
             return
-        space_info = api.get_space_information(self.key, expand='permissions')
+        with report_http_errors():
+            space_info = api.get_space_information(self.key, expand='permissions')
         self.permissions = space_info['permissions']
 
     def root_pages(self):
@@ -161,11 +165,25 @@ def name_for_permission(p):
     return name
 
 
+@contextlib.contextmanager
+def report_http_errors():
+    """Wrap around api calls, so that HTTP errors will be reported usefully."""
+    try:
+        yield
+    except requests.exceptions.HTTPError as err:
+        resp = err.response
+        print(f"Request for {resp.url!r} failed: status {resp.status_code}")
+        print(f"Text response:\n{resp.text}")
+        print()
+        raise
+
+
 def get_api_pages(space_key, type="page"):
     start = 0
     while True:
         print(f"Getting {type}s from {space_key} at {start}")
-        content = api.get_space_content(space_key, limit=100, start=start, expand="ancestors")
+        with report_http_errors():
+            content = api.get_space_content(space_key, limit=100, start=start, expand="ancestors")
         results = content[type]
         if results['size'] == 0:
             break
@@ -177,7 +195,8 @@ def get_api_spaces():
     start = 0
     while True:
         print(f"Getting spaces at {start}")
-        spaces = api.get_spaces(limit=25, start=start, expand="permissions")
+        with report_http_errors():
+            spaces = api.get_spaces(limit=25, start=start, expand="permissions")
         if spaces['size'] == 0:
             break
         yield from spaces['results']
