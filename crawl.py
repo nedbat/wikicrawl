@@ -116,16 +116,14 @@ class Space:
         self.fetch_permissions()
         return any(p for p in self.permissions if permission_is_loggedin_read(p))
 
-    def apparent_space_admins(self):
-        """Return possible space admins (no operation on permission).
-
-        Returns a list of [(name, occurs), ...] in descending order.
-
-        """
+    def admins(self):
+        """Get a sorted list of administrators names."""
         self.fetch_permissions()
-        count = collections.Counter()
-        count.update(name_for_permission(p) for p in self.permissions if 'operation' not in p)
-        return sorted((item for item in count.items() if item[1] > 2), key=lambda item: item[1], reverse=True)
+        space_admin_perm = {'operation': 'administer', 'targetType': 'space'}
+        has_perm = (name_for_permission(p) for p in self.permissions if p.get('operation') == space_admin_perm)
+        not_addon = (name for name in has_perm if not name.startswith('addon_'))
+        # Sort them, but always put "administrators" first.
+        return sorted(not_addon, key=lambda n: "" if n == "administrators" else n)
 
 
 def permission_is_read_space(p):
@@ -277,7 +275,7 @@ def generate_all_space_pages(do_pages, html_dir='html'):
         writer.write(html="<tr><th>Space")
         if do_pages:
             writer.write(html="<th class='right'>Pages<th class='right'>Restricted<th class='right'>Blog Posts")
-        writer.write(html="<th>Anon<th>Logged-in<th>Summary<th>Admins?</tr>")
+        writer.write(html="<th>Anon<th>Logged-in<th>Summary<th>Admins</tr>")
         for space in spaces:
             if do_pages:
                 num_restricted = generate_space_page(space)
@@ -297,8 +295,7 @@ def generate_all_space_pages(do_pages, html_dir='html'):
             writer.write(html=f"<td>{anon}")
             writer.write(html=f"<td>{logged}")
             writer.write(html=f"<td>{PERM_SHORTHANDS[(anon, logged)]}")
-            apparent_admins = ", ".join(f"{i[0]}:{i[1]}" for i in space.apparent_space_admins())
-            writer.write(html=f"<td>{apparent_admins}")
+            writer.write(html=f"<td>{', '.join(space.admins())}")
             writer.write("</tr>\n")
             if do_pages:
                 total_pages += len(space.pages)
