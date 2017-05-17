@@ -248,8 +248,8 @@ def open_for_writing(path):
 
 
 STYLE = """
-.restricted { background: #ffcccc; }
-.parent_restricted { background: #ffff44; }
+.restricted { background: #ffcccc; padding: 2px; margin-left: -2px; }
+.parent_restricted { background: #ffff44; padding: 2px; margin-left: -2px; }
 """
 
 def generate_space_page(space, html_dir='html'):
