@@ -321,7 +321,7 @@ def generate_all_space_pages(do_pages, html_dir='html'):
                 total_restricted += num_restricted
                 total_posts += len(space.blog_posts)
         if do_pages:
-            writer.write(html=f"<tr><td>TOTAL <td class='right'>{total_pages}<td class='right'>{total_restricted}<td class='right'>{total_posts}</tr>")
+            writer.write(html=f"<tr><td>TOTAL: {len(spaces)}<td class='right'>{total_pages}<td class='right'>{total_restricted}<td class='right'>{total_posts}</tr>")
         writer.write(html="</table>")
 
 PERM_SHORTHANDS = {
