@@ -192,6 +192,8 @@ def get_api_pages(space_key, type="page"):
 
 
 def get_api_spaces():
+    # Not sure why spaces are repeated, but let's eliminated duplicates ourselves.
+    seen = set()    # of space ids
     start = 0
     while True:
         print(f"Getting spaces at {start}")
@@ -199,7 +201,10 @@ def get_api_spaces():
             spaces = api.get_spaces(limit=25, start=start, expand="permissions")
         if spaces['size'] == 0:
             break
-        yield from spaces['results']
+        for space in spaces['results']:
+            if space['id'] not in seen:
+                yield space
+                seen.add(space['id'])
         start = spaces['start'] + spaces['size']
 
 
