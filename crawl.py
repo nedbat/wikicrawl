@@ -44,7 +44,17 @@ class Page:
 
     def fetch_restrictions(self):
         with report_http_errors():
-            restrictions = api.get_op_restrictions_for_content_id(self.id)
+            error = None
+            for retry in range(3):
+                try:
+                    restrictions = api.get_op_restrictions_for_content_id(self.id)
+                except requests.exceptions.HTTPError as err:
+                    error = err
+                    continue
+                else:
+                    break
+            else:
+                raise error
         read_res = restrictions['read']['restrictions']
         groups = [gr['name'] for gr in read_res['group']['results']]
         users = [ur['username'] for ur in read_res['user']['results']]
