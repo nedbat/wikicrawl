@@ -20,6 +20,12 @@ api = ConfluenceAPI(keys.USER, keys.PASSWORD, keys.SITE)
 def scrub_title(title):
     return re.sub(r"[^a-z ]", "", title.lower()).strip()
 
+def user_name(user_info):
+    for key in ['username', 'displayName', 'publicName', 'email', 'accountId']:
+        if key in user_info:
+            return user_info[key]
+    return 'UNKNOWN'
+
 class Page:
     def __init__(self, api_page):
         self.id = api_page['id']
@@ -57,7 +63,7 @@ class Page:
                 raise error
         read_res = restrictions['read']['restrictions']
         groups = [gr['name'] for gr in read_res['group']['results']]
-        users = [ur['username'] for ur in read_res['user']['results']]
+        users = [user_name(ur) for ur in read_res['user']['results']]
         if groups or users:
             self.restrictions = (tuple(groups), tuple(users))
 
@@ -171,7 +177,7 @@ def name_for_permission(p):
         if 'group' in subjects:
             name = subjects['group']['results'][0]['name']
         else:
-            name = subjects['user']['results'][0]['username']
+            name = user_name(subjects['user']['results'][0])
     return name
 
 
