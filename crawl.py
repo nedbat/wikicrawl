@@ -81,6 +81,9 @@ class Page:
         else:
             return 0
 
+    def descendants(self):
+        return 1 + sum(c.descendants() for c in self.children)
+
 
 class Space:
     def __init__(self, api_space=None, key=None):
@@ -245,6 +248,9 @@ def write_page(writer, page, parent_restricted=False):
         this_restricted = True
     else:
         this_restricted = False
+    ndescendants = page.descendants()
+    if ndescendants > 1:
+        html += f" <span class='count'>[{ndescendants}]</span>"
 
     if this_restricted:
         num_restricted = 1
@@ -271,6 +277,7 @@ def open_for_writing(path):
 STYLE = """
 .restricted { background: #ffcccc; padding: 2px; margin-left: -2px; }
 .parent_restricted { background: #ffff44; padding: 2px; margin-left: -2px; }
+.count { display: inline-block; margin-left: 1em; font-size: 85%; color: #666; }
 """
 
 def generate_space_page(space, html_dir='html'):
