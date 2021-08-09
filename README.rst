@@ -3,6 +3,10 @@ wikicrawl
 
 This is a crawler to report on pages in a Confluence wiki.
 
+Create a Python 3.8 virtualenv, then install the requirements::
+
+    python -m pip install -r requirements.txt
+
 To run it, create a file called ``keys.py`` like this::
 
     USER = 'myemail@company.com'
