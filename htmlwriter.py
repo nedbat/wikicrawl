@@ -57,7 +57,7 @@ class HtmlOutlineWriter(object):
             cursor: pointer;
         }
     """)
-    HEAD_END = textwrap.dedent(r"""
+    STYLE_END = textwrap.dedent(r"""
         </style>
 
         <script language="JavaScript">
@@ -68,6 +68,9 @@ class HtmlOutlineWriter(object):
             }
         }
         </script>
+    """)
+
+    HEAD_END = textwrap.dedent(r"""
         </head>
         <body>
     """)
@@ -81,11 +84,14 @@ class HtmlOutlineWriter(object):
 
     SECTION_END = "</div></div>"
 
-    def __init__(self, fout, style=""):
+    def __init__(self, fout, title="", style=""):
         self.fout = fout
         self.section_ids = itertools.count()
         self.write(html=self.HEAD)
         self.write(html=style)
+        self.write(html=self.STYLE_END)
+        if title:
+            self.write(html=f"<title>{title}</title>")
         self.write(html=self.HEAD_END)
 
     def write_open_close_all(self):

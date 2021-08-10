@@ -327,7 +327,7 @@ sup { vertical-align: top; font-size: 0.6em; }
 def generate_space_page(space, html_dir='html'):
     space.fetch_pages()
     with open_for_writing(f"{html_dir}/pages_{space.key}.html") as fout:
-        writer = HtmlOutlineWriter(fout, style=STYLE)
+        writer = HtmlOutlineWriter(fout, style=STYLE, title=f"{space.key} space")
         writer.write(html="<h1>")
         writer.write(text=space.key)
         writer.write(html="</h1>")
@@ -351,16 +351,19 @@ def generate_all_space_pages(do_pages, html_dir='html'):
         total_pages = 0
         total_restricted = 0
         total_posts = 0
-        writer = HtmlOutlineWriter(fout, style="""
-            td, th {
-                padding: .25em .5em;
-                text-align: left;
-                vertical-align: top;
-            }
-            td.right, th.right {
-                text-align: right;
-            }
-            """
+        writer = HtmlOutlineWriter(
+            fout, 
+            style="""
+                td, th {
+                    padding: .25em .5em;
+                    text-align: left;
+                    vertical-align: top;
+                }
+                td.right, th.right {
+                    text-align: right;
+                }
+            """,
+            title="All spaces",
         )
         writer.write(html="<table>")
         writer.write(html="<tr><th>Space")
