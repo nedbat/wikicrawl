@@ -29,7 +29,6 @@ class HtmlOutlineWriter(object):
         .toggle-box + label {
             cursor: pointer;
             display: block;
-            line-height: 21px;
         }
 
         .toggle-box + label + div {

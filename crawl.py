@@ -1,5 +1,6 @@
 import collections
 import contextlib
+import datetime
 import itertools
 import os
 import os.path
@@ -26,6 +27,33 @@ def user_name(user_info):
             return user_info[key]
     return 'UNKNOWN'
 
+def remove_end(text, end):
+    """Remove `end` from text if it's there.
+
+    Returns (text, was-removed)
+    """
+    if text.endswith(end):
+        return text[:-len(end)], True
+    else:
+        return text, False
+
+
+class Edit:
+    def __init__(self, who, when):
+        self.who = who
+        self.when = datetime.datetime.fromisoformat(when.rstrip("Z"))
+
+    def to_html(self):
+        who, deactivated = remove_end(self.who, " (Deactivated)")
+        deadclass = " deactivated" if deactivated else ""
+        deadmark = "<sup>&#x2020;</sup>" if deactivated else ""
+        html = f"<span class='edit'>"
+        html += f"<span class='who{deadclass}'>{who}{deadmark} </span>"
+        html += f"<span class='when'>({self.when:%Y-%m-%d})</span>"
+        html += f"</span>"
+        return html
+
+
 class Page:
     def __init__(self, api_page):
         self.id = api_page['id']
@@ -38,6 +66,14 @@ class Page:
         self.parent = None
         self.children = []
         self.restrictions = None
+        self.created = Edit(
+            who=api_page['history']['createdBy']['displayName'],
+            when=api_page['history']['createdDate'],
+        )
+        self.lastedit = Edit(
+            who=api_page['history']['lastUpdated']['by']['displayName'],
+            when=api_page['history']['lastUpdated']['when'],
+        )
 
     def __repr__(self):
         return f"<Page {self.title!r}>"
@@ -202,7 +238,7 @@ def get_api_pages(space_key, type="page"):
     while True:
         print(f"Getting {type}s from {space_key} at {start}")
         with report_http_errors():
-            content = confluence.get_space_content(space_key, limit=100, start=start, expand="ancestors")
+            content = confluence.get_space_content(space_key, limit=100, start=start, expand="ancestors,history,history.lastUpdated")
         results = content[type]
         if results['size'] == 0:
             break
@@ -211,7 +247,7 @@ def get_api_pages(space_key, type="page"):
 
 
 def get_api_spaces():
-    # Not sure why spaces are repeated, but let's eliminated duplicates ourselves.
+    # Not sure why spaces are repeated, but let's eliminate duplicates ourselves.
     seen = set()    # of space ids
     start = 0
     while True:
@@ -251,6 +287,12 @@ def write_page(writer, page, parent_restricted=False):
     ndescendants = page.descendants()
     if ndescendants > 1:
         html += f" <span class='count'>[{ndescendants}]</span>"
+    html += "<span class='edits'>"
+    html += page.created.to_html()
+    if page.lastedit.when.date() != page.created.when.date():
+        html += " &rarr; "
+        html += page.lastedit.to_html()
+    html += "</span>"
 
     if this_restricted:
         num_restricted = 1
@@ -278,6 +320,8 @@ STYLE = """
 .restricted { background: #ffcccc; padding: 2px; margin-left: -2px; }
 .parent_restricted { background: #ffff44; padding: 2px; margin-left: -2px; }
 .count { display: inline-block; margin-left: 1em; font-size: 85%; color: #666; }
+.edits { display: inline-block; margin-left: 1em; }
+sup { vertical-align: top; font-size: 0.6em; }
 """
 
 def generate_space_page(space, html_dir='html'):
