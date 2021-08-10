@@ -84,7 +84,7 @@ class Page:
     def __lt__(self, other):
         return scrub_title(self.title) < scrub_title(other.title)
 
-    def fetch_restrictions(self):
+    def fetch_page_information(self):
         with report_http_errors():
             error = None
             for retry in range(3):
@@ -102,6 +102,9 @@ class Page:
         users = [user_name(ur) for ur in read_res['user']['results']]
         if groups or users:
             self.restrictions = (tuple(groups), tuple(users))
+
+        labels = confluence.get_page_labels(self.id)
+        self.labels = [l['label'] for l in labels['results']]
 
     def breadcrumbs(self):
         if self.parent:
@@ -148,7 +151,7 @@ class Space:
         bar_label = "Reading pages from {}".format(self.key)
         with click.progressbar(self.pages, label=bar_label, show_pos=True) as bar:
             for page in bar:
-                page.fetch_restrictions()
+                page.fetch_page_information()
                 if page.parent_id:
                     try:
                         page.parent = self.pages_by_id[page.parent_id]
@@ -293,6 +296,8 @@ def write_page(writer, page, parent_restricted=False):
         html += " &rarr; "
         html += page.lastedit.to_html()
     html += "</span>"
+    for label in page.labels:
+        html += f"<span class='label'>{label}</span>"
 
     if this_restricted:
         num_restricted = 1
@@ -322,6 +327,10 @@ STYLE = """
 .count { display: inline-block; margin-left: 1em; font-size: 85%; color: #666; }
 .edits { display: inline-block; margin-left: 1em; }
 sup { vertical-align: top; font-size: 0.6em; }
+.label { 
+    display: inline-block; margin-left: .5em; font-size: 85%; border: 1px solid #888; 
+    padding: 0 .25em; border-radius: .15em; background: #f0f0f0;
+    }
 """
 
 def generate_space_page(space, html_dir='html'):
