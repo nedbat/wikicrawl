@@ -106,20 +106,6 @@ class Page:
         labels = confluence.get_page_labels(self.id)
         self.labels = [l['label'] for l in labels['results']]
 
-    def breadcrumbs(self):
-        if self.parent:
-            bc = self.parent.breadcrumbs() + " / "
-        else:
-            bc = ""
-        bc += self.title
-        return bc
-
-    def depth(self):
-        if self.parent:
-            return 1 + self.parent.depth()
-        else:
-            return 0
-
     def descendants(self):
         return 1 + sum(c.descendants() for c in self.children)
 
