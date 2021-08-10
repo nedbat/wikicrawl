@@ -8,13 +8,13 @@ import re
 
 import click
 import requests.exceptions
-from PythonConfluenceAPI import ConfluenceAPI
+from atlassian import Confluence
 
 import keys
 from htmlwriter import HtmlOutlineWriter, prep_html
 
 
-api = ConfluenceAPI(keys.USER, keys.PASSWORD, keys.SITE)
+confluence = Confluence(username=keys.USER, password=keys.PASSWORD, url=keys.SITE)
 
 
 def scrub_title(title):
@@ -53,7 +53,7 @@ class Page:
             error = None
             for retry in range(3):
                 try:
-                    restrictions = api.get_op_restrictions_for_content_id(self.id)
+                    restrictions = confluence.get_all_restrictions_for_content(self.id)
                 except requests.exceptions.HTTPError as err:
                     error = err
                     continue
@@ -125,7 +125,7 @@ class Space:
         if self.permissions is not None:
             return
         with report_http_errors():
-            space_info = api.get_space_information(self.key, expand='permissions')
+            space_info = confluence.get_space_information(self.key, expand='permissions')
         self.permissions = space_info['permissions']
 
     def root_pages(self):
@@ -202,7 +202,7 @@ def get_api_pages(space_key, type="page"):
     while True:
         print(f"Getting {type}s from {space_key} at {start}")
         with report_http_errors():
-            content = api.get_space_content(space_key, limit=100, start=start, expand="ancestors")
+            content = confluence.get_space_content(space_key, limit=100, start=start, expand="ancestors")
         results = content[type]
         if results['size'] == 0:
             break
@@ -217,7 +217,7 @@ def get_api_spaces():
     while True:
         print(f"Getting spaces at {start}")
         with report_http_errors():
-            spaces = api.get_spaces(limit=25, start=start, expand="permissions")
+            spaces = confluence.get_all_spaces(limit=25, start=start, expand="permissions")
         if spaces['size'] == 0:
             break
         for space in spaces['results']:
