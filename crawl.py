@@ -61,28 +61,38 @@ class Edit:
 
 class Page:
     def __init__(self, api_page):
-        self.id = api_page['id']
-        self.title = api_page['title']
-        self.url = api_page['_links']['webui']
-        if api_page['ancestors']:
+        #tqdm.tqdm.write(json.dumps(api_page, indent=4))
+        self.id = api_page.get('id')
+        self.type = api_page['type']
+        self.status = api_page['status']
+        self.title = api_page.get('title', "<no title>")
+        self.url = api_page['_links'].get('webui')
+        if api_page.get('ancestors'):
             self.parent_id = api_page['ancestors'][-1]['id']
         else:
             self.parent_id = None
         self.parent = None
         self.children = []
         self.restrictions = None
-        self.created = Edit(
-            who=api_page['history']['createdBy']['displayName'],
-            when=api_page['history']['createdDate'],
-        )
-        self.lastedit = Edit(
-            who=api_page['history']['lastUpdated']['by']['displayName'],
-            when=api_page['history']['lastUpdated']['when'],
-        )
+        history = api_page.get('history', {})
+        if 'createdBy' in history:
+            self.created = Edit(
+                who=history['createdBy']['displayName'],
+                when=history['createdDate'],
+            )
+        else:
+            self.created = None
+        if 'lastUpdated' in history:
+            self.lastedit = Edit(
+                who=history['lastUpdated']['by']['displayName'],
+                when=history['lastUpdated']['when'],
+            )
+        else:
+            self.lastedit = None
         self.labels = []
 
     def __repr__(self):
-        return f"<Page {self.title!r}>"
+        return f"<Page {self.status} {self.type} {self.title!r} id:{self.id}>"
 
     def __str__(self):
         return repr(self.title)
@@ -91,6 +101,9 @@ class Page:
         return scrub_title(self.title) < scrub_title(other.title)
 
     def fetch_page_information(self):
+        if self.id is None:
+            return
+
         with report_http_errors():
             error = None
             for retry in range(3):
@@ -109,9 +122,10 @@ class Page:
         if groups or users:
             self.restrictions = (tuple(groups), tuple(users))
 
-        with report_http_errors():
-            labels = confluence.get_page_labels(self.id)
-        self.labels = [l['label'] for l in labels['results']]
+        if self.status != "archived":
+            with report_http_errors():
+                labels = confluence.get_page_labels(self.id)
+            self.labels = [l['label'] for l in labels['results']]
 
     def descendants(self):
         return 1 + sum(c.descendants() for c in self.children)
@@ -135,9 +149,7 @@ def work_in_threads(seq, fn, max_workers=10):
 class Space:
     def __init__(self, api_space=None, key=None):
         self.key = key or api_space['key']
-        self.pages = None
-        self.pages_by_id = None
-        self.blog_posts = None
+        self.pages = self.all_pages = self.blog_posts = None
         if api_space:
             self.name = api_space.get('name')
             self.permissions = api_space.get('permissions')
@@ -148,11 +160,15 @@ class Space:
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.key!r}>"
 
+    def pages_with_status(self, status):
+        return [page for page in self.all_pages if page.status == status]
+
     def fetch_pages(self):
-        if self.pages is not None:
+        if self.all_pages is not None:
             return
-        self.pages = list(map(Page, get_api_pages(self.key)))
-        self.pages_by_id = {p.id: p for p in self.pages}
+        self.all_pages = list(map(Page, get_api_pages(self.key)))
+        self.pages = self.pages_with_status("current")
+        pages_by_id = {p.id: p for p in self.pages if p.id is not None}
 
         self.blog_posts = list(map(Page, get_api_pages(self.key, type='blogpost')))
 
@@ -162,7 +178,7 @@ class Space:
             for page, _ in bar:
                 if page.parent_id:
                     try:
-                        page.parent = self.pages_by_id[page.parent_id]
+                        page.parent = pages_by_id[page.parent_id]
                     except:
                         bar.write(f"No parent for page in {self.key}: {page}")
                     else:
@@ -256,13 +272,21 @@ def get_api_pages(space_key, type="page"):
     with prog_bar(desc=desc) as bar:
         while True:
             with report_http_errors():
-                content = confluence.get_space_content(space_key, limit=100, start=start, expand="ancestors,history,history.lastUpdated")
-            results = content[type]
-            if results['size'] == 0:
+                content = confluence.get_all_pages_from_space(
+                    space_key,
+                    content_type=type,
+                    status="any",
+                    limit=100,
+                    start=start,
+                    expand="ancestors,history,history.lastUpdated",
+                )
+            #tqdm.tqdm.write(json.dumps(content, indent=4))
+            num = len(content)
+            if num == 0:
                 break
-            yield from results['results']
-            start = results['start'] + results['size']
-            bar.update(results['size'])
+            yield from content
+            start += num
+            bar.update(num)
 
 
 def get_api_spaces():
@@ -305,15 +329,19 @@ def write_page(writer, page, parent_restricted=False):
         this_restricted = True
     else:
         this_restricted = False
+    if page.status != "current":
+        html += f" <span class='status'>[{page.status}]</span>"
     ndescendants = page.descendants()
     if ndescendants > 1:
         html += f" <span class='count'>[{ndescendants}]</span>"
-    html += "<span class='edits'>"
-    html += page.created.to_html()
-    if page.lastedit.when.date() != page.created.when.date():
-        html += " &rarr; "
-        html += page.lastedit.to_html()
-    html += "</span>"
+    if page.created is not None:
+        html += "<span class='edits'>"
+        html += page.created.to_html()
+        if page.lastedit is not None:
+            if page.lastedit.when.date() != page.created.when.date():
+                html += " &rarr; "
+                html += page.lastedit.to_html()
+        html += "</span>"
     for label in page.labels:
         html += f"<span class='label'>{label}</span>"
 
@@ -342,14 +370,17 @@ def open_for_writing(path):
 STYLE = """
 .restricted { background: #ffcccc; padding: 2px; margin-left: -2px; }
 .parent_restricted { background: #ffff44; padding: 2px; margin-left: -2px; }
+.status { font-style: italic; color: #666; }
 .count { display: inline-block; margin-left: 1em; font-size: 85%; color: #666; }
 .edits { display: inline-block; margin-left: 1em; }
 sup { vertical-align: top; font-size: 0.6em; }
-.label { 
-    display: inline-block; margin-left: .5em; font-size: 85%; border: 1px solid #888; 
+.label {
+    display: inline-block; margin-left: .5em; font-size: 85%; border: 1px solid #888;
     padding: 0 .25em; border-radius: .15em; background: #f0f0f0;
     }
 """
+
+OTHER_STATUSES = ["draft", "archived", "trashed"]
 
 def generate_space_page(space, html_dir='html'):
     space.fetch_pages()
@@ -363,11 +394,18 @@ def generate_space_page(space, html_dir='html'):
         num_restricted = 0
         for page in sorted(space.root_pages()):
             num_restricted += write_page(writer, page)
-        if space.blog_posts:
-            writer.start_section(prep_html(text="Blog Posts"))
-            for post in space.blog_posts:
-                write_page(writer, post)
-            writer.end_section()
+
+        def write_section(title, pages):
+            if pages:
+                writer.start_section(f"{title} <span class='count'>[{len(pages)}]</span>")
+                for page in pages:
+                    write_page(writer, page)
+                writer.end_section()
+
+        for status in OTHER_STATUSES:
+            write_section(status.title() + " pages", space.pages_with_status(status))
+        write_section("Blog Posts", space.blog_posts)
+
     return num_restricted
 
 
@@ -394,7 +432,7 @@ def generate_all_space_pages(do_pages, html_dir='html'):
         total_restricted = 0
         total_posts = 0
         writer = HtmlOutlineWriter(
-            fout, 
+            fout,
             style="""
                 td, th {
                     padding: .25em .5em;
@@ -411,7 +449,10 @@ def generate_all_space_pages(do_pages, html_dir='html'):
         writer.write(html="<tr><th>Space")
         if do_pages:
             writer.write(html="<th class='right'>Pages<th class='right'>Restricted<th class='right'>Blog Posts")
+            for status in OTHER_STATUSES:
+                writer.write(html=f"<th class='right'>{status.title()}")
         writer.write(html="<th>Anon<th>Logged-in<th>Summary<th>Admins</tr>")
+        status_totals = dict.fromkeys(OTHER_STATUSES, 0)
         for space in sorted(spaces, key=lambda s: s.key):
             if do_pages:
                 num_restricted = num_restricteds[space.key]
@@ -426,6 +467,8 @@ def generate_all_space_pages(do_pages, html_dir='html'):
                 writer.write(html=f"<td class='right'>{len(space.pages)}")
                 writer.write(html=f"<td class='right'>{num_restricted}")
                 writer.write(html=f"<td class='right'>{len(space.blog_posts)}")
+                for status in OTHER_STATUSES:
+                    writer.write(html=f"<td class='right'>{len(space.pages_with_status(status))}")
                 space_sizes[space.key] = len(space.pages) + len(space.blog_posts)
             anon = space.has_anonymous_read()
             logged = space.has_loggedin_read()
@@ -438,8 +481,13 @@ def generate_all_space_pages(do_pages, html_dir='html'):
                 total_pages += len(space.pages)
                 total_restricted += num_restricted
                 total_posts += len(space.blog_posts)
+                for status in OTHER_STATUSES:
+                    status_totals[status] += len(space.pages_with_status(status))
         if do_pages:
-            writer.write(html=f"<tr><td>TOTAL: {len(spaces)}<td class='right'>{total_pages}<td class='right'>{total_restricted}<td class='right'>{total_posts}</tr>")
+            writer.write(html=f"<tr><td>TOTAL: {len(spaces)}<td class='right'>{total_pages}<td class='right'>{total_restricted}<td class='right'>{total_posts}")
+            for status in OTHER_STATUSES:
+                writer.write(html=f"<td class='right'>{status_totals[status]}")
+            writer.write("</tr>")
         writer.write(html="</table>")
 
     with open("space_sizes.json", "w") as f:
