@@ -419,6 +419,17 @@ sup { vertical-align: top; font-size: 0.6em; }
     }
 """
 
+SPACES_STYLE = """
+    td, th {
+        padding: .25em .5em;
+        text-align: left;
+        vertical-align: top;
+    }
+    td.right, th.right {
+        text-align: right;
+    }
+""" + STYLE
+
 OTHER_STATUSES = ["draft", "archived", "trashed"]
 
 def generate_space_page(space, html_dir='html'):
@@ -480,20 +491,7 @@ def generate_all_space_pages(do_pages, html_dir='html'):
         total_pages = 0
         total_restricted = 0
         total_posts = 0
-        writer = HtmlOutlineWriter(
-            fout,
-            style="""
-                td, th {
-                    padding: .25em .5em;
-                    text-align: left;
-                    vertical-align: top;
-                }
-                td.right, th.right {
-                    text-align: right;
-                }
-            """,
-            title="All spaces",
-        )
+        writer = HtmlOutlineWriter(fout, style=SPACES_STYLE, title="All spaces")
         writer.write(html="<table>")
         writer.write(html="<tr><th>Space")
         if do_pages:
