@@ -226,9 +226,7 @@ def report_http_errors():
         yield
     except requests.exceptions.HTTPError as err:
         resp = err.response
-        print(f"Request for {resp.url!r} failed: status {resp.status_code}")
-        print(f"Text response:\n{resp.text}")
-        print()
+        tqdm.tqdm.write(f"Request for {resp.url!r} failed: status {resp.status_code}")
         raise
 
 
