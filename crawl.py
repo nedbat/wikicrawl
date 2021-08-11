@@ -74,6 +74,7 @@ class Page:
             who=api_page['history']['lastUpdated']['by']['displayName'],
             when=api_page['history']['lastUpdated']['when'],
         )
+        self.labels = []
 
     def __repr__(self):
         return f"<Page {self.title!r}>"
@@ -103,7 +104,8 @@ class Page:
         if groups or users:
             self.restrictions = (tuple(groups), tuple(users))
 
-        labels = confluence.get_page_labels(self.id)
+        with report_http_errors():
+            labels = confluence.get_page_labels(self.id)
         self.labels = [l['label'] for l in labels['results']]
 
     def descendants(self):
