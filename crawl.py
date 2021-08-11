@@ -192,9 +192,17 @@ class Space:
         space_admin_perm = {'operation': 'administer', 'targetType': 'space'}
         has_perm = (name_for_permission(p) for p in self.permissions if p.get('operation') == space_admin_perm)
         not_addon = (name for name in has_perm if not name.startswith('addon_'))
+        not_boring = (name for name in not_addon if name not in BORING_ADMINS)
         # Sort them, but always put "administrators" first.
-        return sorted(not_addon, key=lambda n: "" if n == "administrators" else n)
+        return sorted(not_boring, key=lambda n: "" if n == "administrators" else n)
 
+BORING_ADMINS = {
+    "Chat Notifications",
+    "Copy Space for Confluence",
+    "Jira Ops Confluence integration",
+    "Lucidchart Diagrams Connector",
+    "Microsoft Teams for Confluence Cloud",
+}
 
 def permission_is_read_space(p):
     return (
