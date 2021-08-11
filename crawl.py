@@ -150,6 +150,8 @@ class Space:
     def __init__(self, api_space=None, key=None):
         self.key = key or api_space['key']
         self.pages = self.all_pages = self.blog_posts = None
+        # A guess, will be filled in with sizes from the last run.
+        self.size = 1
         if api_space:
             self.name = api_space.get('name')
             self.permissions = api_space.get('permissions')
@@ -166,11 +168,11 @@ class Space:
     def fetch_pages(self):
         if self.all_pages is not None:
             return
-        self.all_pages = list(map(Page, get_api_pages(self.key)))
+        self.all_pages = list(map(Page, self.get_api_pages()))
         self.pages = self.pages_with_status("current")
         pages_by_id = {p.id: p for p in self.pages if p.id is not None}
 
-        self.blog_posts = list(map(Page, get_api_pages(self.key, type='blogpost')))
+        self.blog_posts = list(map(Page, self.get_api_pages(type="blogpost")))
 
         bar_label = f"Reading pages from {self.key}"
         results = work_in_threads(self.pages, lambda p: p.fetch_page_information(), max_workers=6)
@@ -183,6 +185,47 @@ class Space:
                         bar.write(f"No parent for page in {self.key}: {page}")
                     else:
                         page.parent.children.append(page)
+
+    def get_api_pages_chunk(self, start):
+        with report_http_errors():
+            return confluence.get_all_pages_from_space(
+                self.key,
+                content_type="page",
+                status="any",
+                limit=100,
+                start=start,
+                expand="ancestors,history,history.lastUpdated",
+            )
+
+    def get_api_pages(self, type="page"):
+        desc = f"Getting {type}s from {self.key}"
+        chunk_size = 100
+        with prog_bar(desc=desc) as bar:
+            start = 0
+            if type == "page":
+                starts = list(range(0, self.size, chunk_size))
+                if starts:
+                    for _, content in work_in_threads(starts, self.get_api_pages_chunk, max_workers=6):
+                        yield from content
+                        bar.update(chunk_size)
+                    start = starts[-1] + chunk_size
+            while True:
+                with report_http_errors():
+                    content = confluence.get_all_pages_from_space(
+                        self.key,
+                        content_type=type,
+                        status="any",
+                        limit=chunk_size,
+                        start=start,
+                        expand="ancestors,history,history.lastUpdated",
+                    )
+                #tqdm.tqdm.write(json.dumps(content, indent=4))
+                num = len(content)
+                if num == 0:
+                    break
+                yield from content
+                start += num
+                bar.update(num)
 
     def fetch_permissions(self):
         if self.permissions is not None:
@@ -266,46 +309,37 @@ def report_http_errors():
         raise
 
 
-def get_api_pages(space_key, type="page"):
-    start = 0
-    desc = f"Getting {type}s from {space_key}"
-    with prog_bar(desc=desc) as bar:
-        while True:
-            with report_http_errors():
-                content = confluence.get_all_pages_from_space(
-                    space_key,
-                    content_type=type,
-                    status="any",
-                    limit=100,
-                    start=start,
-                    expand="ancestors,history,history.lastUpdated",
-                )
-            #tqdm.tqdm.write(json.dumps(content, indent=4))
-            num = len(content)
-            if num == 0:
-                break
-            yield from content
-            start += num
-            bar.update(num)
+def get_api_spaces_chunk(start):
+    with report_http_errors():
+        return confluence.get_all_spaces(limit=10, start=start, expand="permissions")
 
-
-def get_api_spaces():
+def get_api_spaces(num_guess):
     # Not sure why spaces are repeated, but let's eliminate duplicates ourselves.
     seen = set()    # of space ids
     start = 0
     desc = "Getting spaces"
     with prog_bar(desc=desc) as bar:
+        chunk_size = 10
+
+        def handle_spaces(spaces):
+            for space in spaces['results']:
+                if space['id'] not in seen:
+                    yield space
+                    seen.add(space['id'])
+            bar.update(spaces['size'])
+
+        starts = list(range(0, num_guess, chunk_size))
+        if starts:
+            for _, spaces in work_in_threads(starts, get_api_spaces_chunk, max_workers=8):
+                yield from handle_spaces(spaces)
+            start = starts[-1] + chunk_size
         while True:
             with report_http_errors():
                 spaces = confluence.get_all_spaces(limit=10, start=start, expand="permissions")
             if spaces['size'] == 0:
                 break
-            for space in spaces['results']:
-                if space['id'] not in seen:
-                    yield space
-                    seen.add(space['id'])
-            start = spaces['start'] + spaces['size']
-            bar.update(spaces['size'])
+            yield from handle_spaces(spaces)
+            start += spaces['size']
 
 
 def write_page(writer, page, parent_restricted=False):
@@ -410,17 +444,27 @@ def generate_space_page(space, html_dir='html'):
 
 
 def generate_all_space_pages(do_pages, html_dir='html'):
-    api_spaces = get_api_spaces()
-    spaces = [Space(s) for s in api_spaces]
-
     try:
         with open("space_sizes.json") as f:
             space_sizes = json.load(f)
     except:
         space_sizes = {}
 
+    api_spaces = get_api_spaces(num_guess=len(space_sizes) or 200)
+    spaces = [Space(s) for s in api_spaces]
+    for space in spaces:
+        space.size = space_sizes.get(space.key, 1)
+
+    try:
+        with open("space_sizes.json") as f:
+            space_sizes = json.load(f)
+        for space in spaces:
+            space.size = space_sizes.get(space.key, 1)
+    except:
+        space_sizes = {}
+
     # Sort the spaces so that the largest spaces are first.
-    spaces.sort(key=(lambda s: space_sizes.get(s.key, 0)), reverse=True)
+    spaces.sort(key=(lambda s: s.size), reverse=True)
 
     if do_pages:
         num_restricteds = {}
