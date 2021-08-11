@@ -92,7 +92,7 @@ class Page:
             )
         else:
             self.lastedit = None
-        self.labels = []
+        self.labels = [res["label"] for res in api_page.get("metadata", {}).get("labels", {}).get("results", [])]
 
     def __repr__(self):
         return f"<Page {self.status} {self.type} {self.title!r} id:{self.id}>"
@@ -124,11 +124,6 @@ class Page:
         users = [user_name(ur) for ur in read_res['user']['results']]
         if groups or users:
             self.restrictions = (tuple(groups), tuple(users))
-
-        if self.status != "archived":
-            with report_http_errors():
-                labels = confluence.get_page_labels(self.id)
-            self.labels = [l['label'] for l in labels['results']]
 
     def descendants(self):
         return 1 + sum(c.descendants() for c in self.children)
@@ -200,7 +195,7 @@ class Space:
                 status="any",
                 limit=100,
                 start=start,
-                expand="ancestors,history,history.lastUpdated",
+                expand="ancestors,history,history.lastUpdated,metadata.labels",
             )
 
     def get_api_pages(self, type="page"):
