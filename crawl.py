@@ -117,6 +117,21 @@ class Page:
         return 1 + sum(c.descendants() for c in self.children)
 
 
+def work_in_threads(seq, fn, max_workers=10):
+    """Distribute work to threads.
+
+    `seq` is a sequence (probably list) of items.
+    `fn` is a function that will be called on each item, on worker threads.
+    `max_workers` is the maximum number of worker threads.
+
+    This function will yield pairs of (item, fn(item)) as the work is completed.
+    """
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_item = {executor.submit(fn, item): item for item in seq}
+        for future in concurrent.futures.as_completed(future_to_item):
+            item = future_to_item[future]
+            yield item, future.result()
+
 class Space:
     def __init__(self, api_space=None, key=None):
         self.key = key or api_space['key']
@@ -141,20 +156,17 @@ class Space:
 
         self.blog_posts = list(map(Page, get_api_pages(self.key, type='blogpost')))
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
-            future_to_page = {executor.submit(lambda p: p.fetch_page_information(), page): page for page in self.pages}
-            bar_label = f"Reading pages from {self.key}"
-            futures = concurrent.futures.as_completed(future_to_page)
-            with prog_bar(futures, desc=bar_label, total=len(future_to_page)) as bar:
-                for future in bar:
-                    page = future_to_page[future]
-                    if page.parent_id:
-                        try:
-                            page.parent = self.pages_by_id[page.parent_id]
-                        except:
-                            bar.write(f"No parent for page in {self.key}: {page}")
-                        else:
-                            page.parent.children.append(page)
+        bar_label = f"Reading pages from {self.key}"
+        results = work_in_threads(self.pages, lambda p: p.fetch_page_information(), max_workers=6)
+        with prog_bar(results, desc=bar_label, total=len(self.pages)) as bar:
+            for page, _ in bar:
+                if page.parent_id:
+                    try:
+                        page.parent = self.pages_by_id[page.parent_id]
+                    except:
+                        bar.write(f"No parent for page in {self.key}: {page}")
+                    else:
+                        page.parent.children.append(page)
 
     def fetch_permissions(self):
         if self.permissions is not None:
@@ -366,11 +378,8 @@ def generate_all_space_pages(do_pages, html_dir='html'):
 
     if do_pages:
         num_restricteds = {}
-        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-            future_to_space = {executor.submit(generate_space_page, space): space for space in spaces}
-            for future in concurrent.futures.as_completed(future_to_space):
-                space = future_to_space[future]
-                num_restricteds[space.key] = future.result()
+        for space, num_restricted in work_in_threads(spaces, generate_space_page, max_workers=8):
+            num_restricteds[space.key] = num_restricted
 
     with open_for_writing(f"{html_dir}/spaces.html") as fout:
         total_pages = 0
