@@ -39,9 +39,15 @@ def remove_end(text, end):
     else:
         return text, False
 
-
 def prog_bar(seq=None, desc="", **kwargs):
     return tqdm.tqdm(seq, desc=desc.ljust(35), leave=False, **kwargs)
+
+def html_for_name(name):
+    name, deactivated = remove_end(name, " (Deactivated)")
+    deadclass = " deactivated" if deactivated else ""
+    deadmark = "<sup>&#x2020;</sup>" if deactivated else ""
+    html = f"<span class='who{deadclass}'>{name}{deadmark}</span>"
+    return html
 
 class Edit:
     def __init__(self, who, when):
@@ -49,12 +55,9 @@ class Edit:
         self.when = datetime.datetime.fromisoformat(when.rstrip("Z"))
 
     def to_html(self):
-        who, deactivated = remove_end(self.who, " (Deactivated)")
-        deadclass = " deactivated" if deactivated else ""
-        deadmark = "<sup>&#x2020;</sup>" if deactivated else ""
         html = f"<span class='edit'>"
-        html += f"<span class='who{deadclass}'>{who}{deadmark} </span>"
-        html += f"<span class='when'>({self.when:%Y-%m-%d})</span>"
+        html += html_for_name(self.who)
+        html += f"<span class='when'> ({self.when:%Y-%m-%d})</span>"
         html += f"</span>"
         return html
 
@@ -356,7 +359,8 @@ def write_page(writer, page, parent_restricted=False):
     if page.restrictions:
         html = prep_html(html=html, klass="restricted")
         limits = sorted(itertools.chain.from_iterable(page.restrictions))
-        html += " (" + prep_html(text=", ".join(limits)) + ")"
+        html_names = (prep_html(text=n) for n in limits)
+        html += " (" + prep_html(html=", ".join(map(html_for_name, html_names))) + ")"
         this_restricted = True
     elif parent_restricted:
         html = prep_html(html=html, klass="parent_restricted")
@@ -407,6 +411,7 @@ STYLE = """
 .status { font-style: italic; color: #666; }
 .count { display: inline-block; margin-left: 1em; font-size: 85%; color: #666; }
 .edits { display: inline-block; margin-left: 1em; }
+.deactivated { color: #666; }
 sup { vertical-align: top; font-size: 0.6em; }
 .label {
     display: inline-block; margin-left: .5em; font-size: 85%; border: 1px solid #888;
@@ -519,7 +524,7 @@ def generate_all_space_pages(do_pages, html_dir='html'):
             writer.write(html=f"<td>{anon}")
             writer.write(html=f"<td>{logged}")
             writer.write(html=f"<td>{PERM_SHORTHANDS[(anon, logged)]}")
-            writer.write(html=f"<td>{', '.join(space.admins())}")
+            writer.write(html=f"<td>{', '.join(map(html_for_name, space.admins()))}")
             writer.write("</tr>\n")
             if do_pages:
                 total_pages += len(space.pages)
