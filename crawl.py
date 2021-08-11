@@ -3,6 +3,7 @@ import concurrent.futures
 import contextlib
 import datetime
 import itertools
+import json
 import os
 import os.path
 import re
@@ -352,33 +353,18 @@ def generate_space_page(space, html_dir='html'):
     return num_restricted
 
 
-# Space sizes as of August 2021:
-LARGE_SPACES = {
-    "RELEASES": 2805,
-    "SRE": 989,
-    "LEARNER": 981,
-    "ArchiveEng": 769,
-    "DE": 661,
-    "PT": 620,
-    "SFDC": 635,
-    "AC": 687,
-    "ENG": 538,
-    "SOL": 505,
-    "SUST": 469,
-    "AN": 466,
-    "PROD": 464,
-    "COMM": 346,
-    "ECOM": 321,
-    "IT": 305,
-    "FEDX": 302,
-}
-
 def generate_all_space_pages(do_pages, html_dir='html'):
     api_spaces = get_api_spaces()
     spaces = [Space(s) for s in api_spaces]
 
+    try:
+        with open("space_sizes.json") as f:
+            space_sizes = json.load(f)
+    except:
+        space_sizes = {}
+
     # Sort the spaces so that the largest spaces are first.
-    spaces.sort(key=(lambda s: LARGE_SPACES.get(s.key, 0)), reverse=True)
+    spaces.sort(key=(lambda s: space_sizes.get(s.key, 0)), reverse=True)
 
     if do_pages:
         num_restricteds = {}
@@ -425,6 +411,7 @@ def generate_all_space_pages(do_pages, html_dir='html'):
                 writer.write(html=f"<td class='right'>{len(space.pages)}")
                 writer.write(html=f"<td class='right'>{num_restricted}")
                 writer.write(html=f"<td class='right'>{len(space.blog_posts)}")
+                space_sizes[space.key] = len(space.pages) + len(space.blog_posts)
             anon = space.has_anonymous_read()
             logged = space.has_loggedin_read()
             writer.write(html=f"<td>{anon}")
@@ -439,6 +426,9 @@ def generate_all_space_pages(do_pages, html_dir='html'):
         if do_pages:
             writer.write(html=f"<tr><td>TOTAL: {len(spaces)}<td class='right'>{total_pages}<td class='right'>{total_restricted}<td class='right'>{total_posts}</tr>")
         writer.write(html="</table>")
+
+    with open("space_sizes.json", "w") as f:
+        json.dump(space_sizes, f)
 
 PERM_SHORTHANDS = {
     (False, False): "Internal",

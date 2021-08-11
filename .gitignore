@@ -4,3 +4,4 @@ __pycache__
 keys.py
 html
 *.html
+space_sizes.json
