@@ -39,6 +39,9 @@ def remove_end(text, end):
         return text, False
 
 
+def prog_bar(seq=None, desc="", **kwargs):
+    return tqdm.tqdm(seq, desc=desc.ljust(35), leave=False, **kwargs)
+
 class Edit:
     def __init__(self, who, when):
         self.who = who
@@ -137,16 +140,20 @@ class Space:
 
         self.blog_posts = list(map(Page, get_api_pages(self.key, type='blogpost')))
 
-        bar_label = f"Reading pages from {self.key}".ljust(30)
-        for page in tqdm.tqdm(self.pages, desc=bar_label):
-            page.fetch_page_information()
-            if page.parent_id:
-                try:
-                    page.parent = self.pages_by_id[page.parent_id]
-                except:
-                    print(f"No parent for {page}")
-                else:
-                    page.parent.children.append(page)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+            future_to_page = {executor.submit(lambda p: p.fetch_page_information(), page): page for page in self.pages}
+            bar_label = f"Reading pages from {self.key}"
+            futures = concurrent.futures.as_completed(future_to_page)
+            with prog_bar(futures, desc=bar_label, total=len(future_to_page)) as bar:
+                for future in bar:
+                    page = future_to_page[future]
+                    if page.parent_id:
+                        try:
+                            page.parent = self.pages_by_id[page.parent_id]
+                        except:
+                            bar.write(f"No parent for {page}")
+                        else:
+                            page.parent.children.append(page)
 
     def fetch_permissions(self):
         if self.permissions is not None:
@@ -226,8 +233,8 @@ def report_http_errors():
 
 def get_api_pages(space_key, type="page"):
     start = 0
-    desc = f"Getting {type}s from {space_key}".ljust(30)
-    with tqdm.tqdm(desc=desc) as bar:
+    desc = f"Getting {type}s from {space_key}"
+    with prog_bar(desc=desc) as bar:
         while True:
             with report_http_errors():
                 content = confluence.get_space_content(space_key, limit=100, start=start, expand="ancestors,history,history.lastUpdated")
@@ -243,8 +250,8 @@ def get_api_spaces():
     # Not sure why spaces are repeated, but let's eliminate duplicates ourselves.
     seen = set()    # of space ids
     start = 0
-    desc = "Getting spaces".ljust(30)
-    with tqdm.tqdm(desc=desc) as bar:
+    desc = "Getting spaces"
+    with prog_bar(desc=desc) as bar:
         while True:
             with report_http_errors():
                 spaces = confluence.get_all_spaces(limit=10, start=start, expand="permissions")
@@ -345,18 +352,37 @@ def generate_space_page(space, html_dir='html'):
     return num_restricted
 
 
-LARGE_SPACES = {"RELEASES", "SRE", "LEARNER", "PT", "SFDC", "AC", "PROD", "SOL", "SUST"}
+# Space sizes as of August 2021:
+LARGE_SPACES = {
+    "RELEASES": 2805,
+    "SRE": 989,
+    "LEARNER": 981,
+    "ArchiveEng": 769,
+    "DE": 661,
+    "PT": 620,
+    "SFDC": 635,
+    "AC": 687,
+    "ENG": 538,
+    "SOL": 505,
+    "SUST": 469,
+    "AN": 466,
+    "PROD": 464,
+    "COMM": 346,
+    "ECOM": 321,
+    "IT": 305,
+    "FEDX": 302,
+}
 
 def generate_all_space_pages(do_pages, html_dir='html'):
     api_spaces = get_api_spaces()
     spaces = [Space(s) for s in api_spaces]
 
-    # Sort the spaces, so that the largest spaces are first.
-    spaces.sort(key=lambda s: s.key not in LARGE_SPACES)
+    # Sort the spaces so that the largest spaces are first.
+    spaces.sort(key=(lambda s: LARGE_SPACES.get(s.key, 0)), reverse=True)
 
     if do_pages:
         num_restricteds = {}
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
             future_to_space = {executor.submit(generate_space_page, space): space for space in spaces}
             for future in concurrent.futures.as_completed(future_to_space):
                 space = future_to_space[future]
