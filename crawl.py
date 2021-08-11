@@ -192,11 +192,11 @@ class Space:
                     else:
                         page.parent.children.append(page)
 
-    def get_api_pages_chunk(self, start):
+    def get_api_pages_chunk(self, start, type="page"):
         with report_http_errors():
             return confluence.get_all_pages_from_space(
                 self.key,
-                content_type="page",
+                content_type=type,
                 status="any",
                 limit=100,
                 start=start,
@@ -208,30 +208,23 @@ class Space:
         chunk_size = 100
         with prog_bar(desc=desc) as bar:
             start = 0
+            def handle_content(content):
+                #tqdm.tqdm.write(json.dumps(content, indent=4))
+                yield from content
+                bar.update(len(content))
+
             if type == "page":
                 starts = list(range(0, self.size, chunk_size))
                 if starts:
                     for _, content in work_in_threads(starts, self.get_api_pages_chunk, max_workers=6):
-                        yield from content
-                        bar.update(chunk_size)
+                        yield from handle_content(content)
                     start = starts[-1] + chunk_size
             while True:
-                with report_http_errors():
-                    content = confluence.get_all_pages_from_space(
-                        self.key,
-                        content_type=type,
-                        status="any",
-                        limit=chunk_size,
-                        start=start,
-                        expand="ancestors,history,history.lastUpdated",
-                    )
-                #tqdm.tqdm.write(json.dumps(content, indent=4))
-                num = len(content)
-                if num == 0:
+                content = self.get_api_pages_chunk(start, type=type)
+                if not content:
                     break
-                yield from content
-                start += num
-                bar.update(num)
+                yield from handle_content(content)
+                start += len(content)
 
     def fetch_permissions(self):
         if self.permissions is not None:
