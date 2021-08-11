@@ -152,7 +152,7 @@ class Space:
                         try:
                             page.parent = self.pages_by_id[page.parent_id]
                         except:
-                            bar.write(f"No parent for {page}")
+                            bar.write(f"No parent for page in {self.key}: {page}")
                         else:
                             page.parent.children.append(page)
 
