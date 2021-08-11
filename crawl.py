@@ -146,8 +146,11 @@ def work_in_threads(seq, fn, max_workers=10):
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_item = {executor.submit(fn, item): item for item in seq}
         for future in concurrent.futures.as_completed(future_to_item):
+            if future.exception() is not None:
+                tqdm.tqdm.write(f"Exception in future: {future.exception()}")
             item = future_to_item[future]
             yield item, future.result()
+
 
 class Space:
     def __init__(self, api_space=None, key=None):
