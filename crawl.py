@@ -92,7 +92,9 @@ class Page:
             )
         else:
             self.lastedit = None
-        self.labels = [res["label"] for res in api_page.get("metadata", {}).get("labels", {}).get("results", [])]
+        metadata = api_page.get("metadata", {})
+        self.labels = [res["label"] for res in metadata.get("labels", {}).get("results", [])]
+        self.likes = metadata.get("likes", {}).get("count", 0)
 
     def __repr__(self):
         return f"<Page {self.status} {self.type} {self.title!r} id:{self.id}>"
@@ -195,7 +197,7 @@ class Space:
                 status="any",
                 limit=100,
                 start=start,
-                expand="ancestors,history,history.lastUpdated,metadata.labels",
+                expand="ancestors,history,history.lastUpdated,metadata.labels,metadata.likes",
             )
 
     def get_api_pages(self, type="page"):
@@ -358,8 +360,13 @@ def write_page(writer, page, parent_restricted=False):
         this_restricted = True
     else:
         this_restricted = False
+
+    if page.likes > 0:
+        html += f" <span class='likes'>{page.likes}</span>"
+
     if page.status != "current":
         html += f" <span class='status'>[{page.status}]</span>"
+
     ndescendants = page.descendants()
     if ndescendants > 1:
         html += f" <span class='count'>[{ndescendants}]</span>"
@@ -371,6 +378,7 @@ def write_page(writer, page, parent_restricted=False):
                 html += " &rarr; "
                 html += page.lastedit.to_html()
         html += "</span>"
+
     for label in page.labels:
         html += f"<span class='label'>{label}</span>"
 
@@ -408,6 +416,7 @@ sup { vertical-align: top; font-size: 0.6em; }
     display: inline-block; margin-left: .5em; font-size: 85%; border: 1px solid #888;
     padding: 0 .25em; border-radius: .15em; background: #f0f0f0;
     }
+.likes { border: 1px solid blue; border-radius: 1em; font-size: 80%; min-width: 1em; display: inline-block; text-align: center; background: #ddf; }
 """
 
 SPACES_STYLE = """
