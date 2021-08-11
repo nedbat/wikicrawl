@@ -1,14 +1,15 @@
 import collections
+import concurrent.futures
 import contextlib
 import datetime
 import itertools
 import os
 import os.path
-import pprint
 import re
 
 import click
 import requests.exceptions
+import tqdm
 from atlassian import Confluence
 
 import keys
@@ -136,17 +137,16 @@ class Space:
 
         self.blog_posts = list(map(Page, get_api_pages(self.key, type='blogpost')))
 
-        bar_label = "Reading pages from {}".format(self.key)
-        with click.progressbar(self.pages, label=bar_label, show_pos=True) as bar:
-            for page in bar:
-                page.fetch_page_information()
-                if page.parent_id:
-                    try:
-                        page.parent = self.pages_by_id[page.parent_id]
-                    except:
-                        print(f"No parent for {page}")
-                    else:
-                        page.parent.children.append(page)
+        bar_label = f"Reading pages from {self.key}".ljust(30)
+        for page in tqdm.tqdm(self.pages, desc=bar_label):
+            page.fetch_page_information()
+            if page.parent_id:
+                try:
+                    page.parent = self.pages_by_id[page.parent_id]
+                except:
+                    print(f"No parent for {page}")
+                else:
+                    page.parent.children.append(page)
 
     def fetch_permissions(self):
         if self.permissions is not None:
@@ -226,32 +226,36 @@ def report_http_errors():
 
 def get_api_pages(space_key, type="page"):
     start = 0
-    while True:
-        print(f"Getting {type}s from {space_key} at {start}")
-        with report_http_errors():
-            content = confluence.get_space_content(space_key, limit=100, start=start, expand="ancestors,history,history.lastUpdated")
-        results = content[type]
-        if results['size'] == 0:
-            break
-        yield from results['results']
-        start = results['start'] + results['size']
+    desc = f"Getting {type}s from {space_key}".ljust(30)
+    with tqdm.tqdm(desc=desc) as bar:
+        while True:
+            with report_http_errors():
+                content = confluence.get_space_content(space_key, limit=100, start=start, expand="ancestors,history,history.lastUpdated")
+            results = content[type]
+            if results['size'] == 0:
+                break
+            yield from results['results']
+            start = results['start'] + results['size']
+            bar.update(results['size'])
 
 
 def get_api_spaces():
     # Not sure why spaces are repeated, but let's eliminate duplicates ourselves.
     seen = set()    # of space ids
     start = 0
-    while True:
-        print(f"Getting spaces at {start}")
-        with report_http_errors():
-            spaces = confluence.get_all_spaces(limit=25, start=start, expand="permissions")
-        if spaces['size'] == 0:
-            break
-        for space in spaces['results']:
-            if space['id'] not in seen:
-                yield space
-                seen.add(space['id'])
-        start = spaces['start'] + spaces['size']
+    desc = "Getting spaces".ljust(30)
+    with tqdm.tqdm(desc=desc) as bar:
+        while True:
+            with report_http_errors():
+                spaces = confluence.get_all_spaces(limit=10, start=start, expand="permissions")
+            if spaces['size'] == 0:
+                break
+            for space in spaces['results']:
+                if space['id'] not in seen:
+                    yield space
+                    seen.add(space['id'])
+            start = spaces['start'] + spaces['size']
+            bar.update(spaces['size'])
 
 
 def write_page(writer, page, parent_restricted=False):
@@ -340,10 +344,24 @@ def generate_space_page(space, html_dir='html'):
             writer.end_section()
     return num_restricted
 
+
+LARGE_SPACES = {"RELEASES", "SRE", "LEARNER", "PT", "SFDC", "AC", "PROD", "SOL", "SUST"}
+
 def generate_all_space_pages(do_pages, html_dir='html'):
     api_spaces = get_api_spaces()
     spaces = [Space(s) for s in api_spaces]
-    spaces.sort(key=lambda s: s.key)
+
+    # Sort the spaces, so that the largest spaces are first.
+    spaces.sort(key=lambda s: s.key not in LARGE_SPACES)
+
+    if do_pages:
+        num_restricteds = {}
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_space = {executor.submit(generate_space_page, space): space for space in spaces}
+            for future in concurrent.futures.as_completed(future_to_space):
+                space = future_to_space[future]
+                num_restricteds[space.key] = future.result()
+
     with open_for_writing(f"{html_dir}/spaces.html") as fout:
         total_pages = 0
         total_restricted = 0
@@ -367,9 +385,9 @@ def generate_all_space_pages(do_pages, html_dir='html'):
         if do_pages:
             writer.write(html="<th class='right'>Pages<th class='right'>Restricted<th class='right'>Blog Posts")
         writer.write(html="<th>Anon<th>Logged-in<th>Summary<th>Admins</tr>")
-        for space in spaces:
+        for space in sorted(spaces, key=lambda s: s.key):
             if do_pages:
-                num_restricted = generate_space_page(space)
+                num_restricted = num_restricteds[space.key]
 
             writer.write("<tr>")
             title = space.key
