@@ -99,11 +99,8 @@ class Page:
             )
         else:
             self.lastedit = None
+        self.visits = None
 
-        if 'CLOUD_SESSION_TOKEN' in dir(keys):
-            self.visits = get_visits(self.id, keys.CLOUD_SESSION_TOKEN)
-        else:
-            self.visits = None
         metadata = api_page.get("metadata", {})
         self.labels = [res["label"] for res in metadata.get("labels", {}).get("results", [])]
         self.likes = metadata.get("likes", {}).get("count", 0)
@@ -139,6 +136,11 @@ class Page:
         if groups or users:
             self.restrictions = (tuple(groups), tuple(users))
 
+        if 'CLOUD_SESSION_COOKIE_TOKEN' in dir(keys):
+            visits = get_visits(self.id, keys.CLOUD_SESSION_COOKIE_TOKEN)
+            if visits:
+                self.visits = sum(v["total"] for v in visits)
+
     def descendants(self):
         return 1 + sum(c.descendants() for c in self.children)
 
@@ -165,6 +167,7 @@ def work_in_threads(seq, fn, max_workers=10):
         for future in concurrent.futures.as_completed(future_to_item):
             if future.exception() is not None:
                 tqdm.tqdm.write(f"Exception in future: {future.exception()}")
+                continue
             item = future_to_item[future]
             yield item, future.result()
 
@@ -256,6 +259,9 @@ class Space:
 
     def total_page_count(self):
         return len(self.all_pages) + len(self.blog_posts)
+
+    def total_visits(self):
+        return sum(p.visits for p in self.pages if p.visits is not None)
 
     def has_anonymous_read(self):
         self.fetch_permissions()
@@ -387,6 +393,9 @@ def write_page(writer, page, parent_restricted=False):
     else:
         this_restricted = False
 
+    if page.visits:
+        html += f" <span class='visits'>{page.visits}</span>"
+
     if page.likes > 0:
         html += f" <span class='likes'>{page.likes}</span>"
 
@@ -442,6 +451,7 @@ sup { vertical-align: top; font-size: 0.6em; }
     display: inline-block; margin-left: .5em; font-size: 85%; border: 1px solid #888;
     padding: 0 .25em; border-radius: .15em; background: #f0f0f0;
     }
+.visits { font-weight: bold; }
 .likes { border: 1px solid blue; border-radius: 1em; font-size: 80%; padding: .1em .25em 0 .25em; display: inline-block; text-align: center; background: #ddf; }
 """
 
@@ -490,6 +500,12 @@ def generate_space_page(space, html_dir='html'):
 
     return num_restricted
 
+
+def html_for_visits(visits):
+    return f"<span class='visits'>{visits}</span>" if visits else ""
+
+def html_for_likes(likes):
+    return f"<span class='likes'>{likes}</span>" if likes else ""
 
 def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_smallest=0):
     try:
@@ -543,8 +559,9 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
             writer.write("<th class='right'>Pages<th class='right'>Restricted<th class='right'>Blog Posts")
             for status in OTHER_STATUSES:
                 writer.write(f"<th class='right'>{status.title()}")
-            writer.write("<th class='right'>Likes<th class='right'>Last Edit")
-        writer.write("<th>Anon<th>Logged-in<th>Summary<th>Admins</tr>")
+            writer.write("<th class='right'>Visits<th class='right'>Likes<th class='right'>Last Edit")
+        writer.write("<th>Anon<th>Logged-in<th>Summary<th>Admins")
+        writer.write("</tr>")
         status_totals = dict.fromkeys(OTHER_STATUSES, 0)
         for order, space in enumerate(sorted(spaces, key=lambda s: s.key)):
             if do_pages:
@@ -563,8 +580,8 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
                 for status in OTHER_STATUSES:
                     tdr(len(space.pages_with_status(status)))
                 space_sizes[space.key] = space.total_page_count()
-                likes = space.likes()
-                tdr(f"<span class='likes'>{likes}</span>" if likes else "")
+                tdr(html_for_visits(space.total_visits()))
+                tdr(html_for_likes(space.likes()))
                 latest_edit = space.latest_edit()
                 tdr(latest_edit.to_html() if latest_edit else "")
             anon = space.has_anonymous_read()
@@ -595,7 +612,7 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
     if do_pages:
         with open_for_writing(f"{html_dir}/all_spaces_pages.html") as fout:
             writer = HtmlOutlineWriter(fout, style=SPACES_STYLE, title="All space pages")
-            writer.write(html="<table><tr><th>Created</th><th>Last Edited</th><th>Last Edited by:</th><th>Space</th><th>Type</th><th>Page</th></tr>")
+            writer.write(html="<table><tr><th>Created</th><th>Last Edited</th><th>Last Edited by:</th><th>Views</th><th>Likes</th><th>Space</th><th>Type</th><th>Page</th></tr>")
             for space in spaces:
                 for page in itertools.chain(space.all_pages, space.blog_posts):
                     if page.created is None:
@@ -604,6 +621,8 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
                     tdr(html_for_datetime(page.created.when))
                     tdr(html_for_datetime(page.lastedit.when))
                     tdl(html_for_name(page.lastedit.who))
+                    tdr(html_for_visits(page.visits))
+                    tdr(html_for_likes(page.likes))
                     tdl(space.key)
                     tdl(page.type)
                     tdl(page.html_for_name())

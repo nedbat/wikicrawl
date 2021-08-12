@@ -19,7 +19,8 @@ If you wish to get visited data on your pages, you can add CLOUD_SESSION_COOKIE_
 
     CLOUD_SESSION_COOKIE_TOKEN = "sdljfslajdflashdflasjdflkajsldfjalsndamvosjdmiweryoweiurasnasdvosdueursasdkhasohdfasuioyfasjfioehsanfsflksajfioe"
 
-  You will need to copy the value from cookie in browser called ``cloud.session.token`` that is scoped to something similar to ``.atlassian.net``
+You will need to copy the value from a cookie in your browser called ``cloud.session.token`` that is scoped to something similar to ``.atlassian.net``.
+Your actual value will be much longer than this (~900 characters).
 
 Then run::
 
