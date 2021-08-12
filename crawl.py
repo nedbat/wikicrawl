@@ -498,7 +498,8 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
 
     if do_pages:
         num_restricteds = {}
-        for space, num_restricted in work_in_threads(spaces, generate_space_page, max_workers=8):
+        work = work_in_threads(spaces, generate_space_page, max_workers=8)
+        for space, num_restricted in prog_bar(work, desc="Reading spaces", total=len(spaces)):
             num_restricteds[space.key] = num_restricted
 
     def tdl(html):
