@@ -15,6 +15,12 @@ To run it, create a file called ``keys.py`` like this::
 
 The PASSWORD is an API token you can get from https://id.atlassian.com/manage-profile/security/api-tokens
 
+If you wish to get visited data on your pages, you can add CLOUD_SESSION_COOKIE_TOKEN to ``keys.py`` like this::
+
+    CLOUD_SESSION_COOKIE_TOKEN = "sdljfslajdflashdflasjdflkajsldfjalsndamvosjdmiweryoweiurasnasdvosdueursasdkhasohdfasuioyfasjfioehsanfsflksajfioe"
+
+  You will need to copy the value from cookie in browser called ``cloud.session.token`` that is scoped to something similar to ``.atlassian.net``
+
 Then run::
 
     python crawl.py --all --pages
