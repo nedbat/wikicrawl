@@ -684,11 +684,16 @@ PERM_SHORTHANDS = {
 @click.command(help="Examine a Confluence wiki and produce an HTML report on spaces and permissions")
 @click.option('--all', 'all_spaces', is_flag=True, help="Examine all spaces")
 @click.option('--pages/--no-pages', default=True, help="Examine the page trees")
+@click.option('--visits/--no-visits', default=True, help="Collect visit stats")
 @click.option('--htmldir', default='html', metavar="DIR", help="Directory to get the HTML results")
 @click.option('--skip-largest', type=int, default=0, metavar="N", help="Skip N largest spaces")
 @click.option('--skip-smallest', type=int, default=0, metavar="N", help="Skip N smallest spaces")
 @click.argument('space_keys', nargs=-1)
-def main(all_spaces, pages, htmldir, space_keys, skip_largest, skip_smallest):
+def main(all_spaces, pages, visits, htmldir, space_keys, skip_largest, skip_smallest):
+    if not visits:
+        # Cheap way to prevent collecting visit information.
+        del keys.CLOUD_SESSION_COOKIE_TOKEN
+
     if all_spaces:
         if space_keys:
             click.echo("Can't specify space keys with --all")
