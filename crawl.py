@@ -46,13 +46,16 @@ def html_for_name(name):
     name, deactivated = remove_end(name, " (Deactivated)")
     deadclass = " deactivated" if deactivated else ""
     deadmark = "<sup>&#x2020;</sup>" if deactivated else ""
-    html = f"<span class='who{deadclass}'>{name}{deadmark}</span>"
+    html = f"<span class='who{deadclass}'>{prep_html(text=name)}{deadmark}</span>"
     return html
 
 class Edit:
     def __init__(self, who, when):
         self.who = who
         self.when = datetime.datetime.fromisoformat(when.rstrip("Z"))
+
+    def __lt__(self, other):
+        return self.when < other.when
 
     def to_html(self):
         html = f"<span class='edit'>"
@@ -233,6 +236,9 @@ class Space:
     def root_pages(self):
         return (page for page in self.pages if page.parent is None)
 
+    def total_page_count(self):
+        return len(self.all_pages) + len(self.blog_posts)
+
     def has_anonymous_read(self):
         self.fetch_permissions()
         return any(p for p in self.permissions if permission_is_anonymous_read(p))
@@ -250,6 +256,12 @@ class Space:
         not_boring = (name for name in not_addon if name not in BORING_ADMINS)
         # Sort them, but always put "administrators" first.
         return sorted(not_boring, key=lambda n: "" if n == "administrators" else n)
+
+    def likes(self):
+        return sum(page.likes for page in self.pages)
+
+    def latest_edit(self):
+        return max((page.lastedit for page in self.pages), default=None)
 
 BORING_ADMINS = {
     "Chat Notifications",
@@ -416,7 +428,7 @@ sup { vertical-align: top; font-size: 0.6em; }
     display: inline-block; margin-left: .5em; font-size: 85%; border: 1px solid #888;
     padding: 0 .25em; border-radius: .15em; background: #f0f0f0;
     }
-.likes { border: 1px solid blue; border-radius: 1em; font-size: 80%; min-width: 1em; display: inline-block; text-align: center; background: #ddf; }
+.likes { border: 1px solid blue; border-radius: 1em; font-size: 80%; padding: .1em .25em 0 .25em; display: inline-block; text-align: center; background: #ddf; }
 """
 
 SPACES_STYLE = """
@@ -459,7 +471,7 @@ def generate_space_page(space, html_dir='html'):
     return num_restricted
 
 
-def generate_all_space_pages(do_pages, html_dir='html'):
+def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_smallest=0):
     try:
         with open("space_sizes.json") as f:
             space_sizes = json.load(f)
@@ -467,7 +479,7 @@ def generate_all_space_pages(do_pages, html_dir='html'):
         space_sizes = {}
 
     api_spaces = get_api_spaces(num_guess=len(space_sizes) or 200)
-    spaces = [Space(s) for s in api_spaces]
+    spaces = [Space(sd) for sd in api_spaces]
     for space in spaces:
         space.size = space_sizes.get(space.key, 1)
 
@@ -481,24 +493,38 @@ def generate_all_space_pages(do_pages, html_dir='html'):
 
     # Sort the spaces so that the largest spaces are first.
     spaces.sort(key=(lambda s: s.size), reverse=True)
+    # Skip some, for dev purposes.
+    spaces = spaces[skip_largest:(-skip_smallest if skip_smallest else None)]
 
     if do_pages:
         num_restricteds = {}
-        for space, num_restricted in work_in_threads(spaces, generate_space_page, max_workers=8):
+        work = work_in_threads(spaces, generate_space_page, max_workers=8)
+        for space, num_restricted in prog_bar(work, desc="Reading spaces", total=len(spaces)):
             num_restricteds[space.key] = num_restricted
+
+    def tdl(html):
+        writer.write("<td>")
+        writer.write(str(html))
+        writer.write("</td>")
+
+    def tdr(html):
+        writer.write("<td class='right'>")
+        writer.write(str(html))
+        writer.write("</td>")
 
     with open_for_writing(f"{html_dir}/spaces.html") as fout:
         total_pages = 0
         total_restricted = 0
         total_posts = 0
         writer = HtmlOutlineWriter(fout, style=SPACES_STYLE, title="All spaces")
-        writer.write(html="<table>")
-        writer.write(html="<tr><th>Space")
+        writer.write("<table>")
+        writer.write("<tr><th>Space")
         if do_pages:
-            writer.write(html="<th class='right'>Pages<th class='right'>Restricted<th class='right'>Blog Posts")
+            writer.write("<th class='right'>Pages<th class='right'>Restricted<th class='right'>Blog Posts")
             for status in OTHER_STATUSES:
-                writer.write(html=f"<th class='right'>{status.title()}")
-        writer.write(html="<th>Anon<th>Logged-in<th>Summary<th>Admins</tr>")
+                writer.write(f"<th class='right'>{status.title()}")
+            writer.write("<th class='right'>Likes<th class='right'>Last Edit")
+        writer.write("<th>Anon<th>Logged-in<th>Summary<th>Admins</tr>")
         status_totals = dict.fromkeys(OTHER_STATUSES, 0)
         for space in sorted(spaces, key=lambda s: s.key):
             if do_pages:
@@ -508,21 +534,24 @@ def generate_all_space_pages(do_pages, html_dir='html'):
             title = space.key
             if space.name:
                 title += ": " + space.name
-            title = prep_html(text=title, href=f"pages_{space.key}.html" if do_pages else None)
-            writer.write(html=f"<td>{title}")
+            tdl(prep_html(text=title, href=f"pages_{space.key}.html" if do_pages else None))
             if do_pages:
-                writer.write(html=f"<td class='right'>{len(space.pages)}")
-                writer.write(html=f"<td class='right'>{num_restricted}")
-                writer.write(html=f"<td class='right'>{len(space.blog_posts)}")
+                tdr(len(space.pages))
+                tdr(num_restricted)
+                tdr(len(space.blog_posts))
                 for status in OTHER_STATUSES:
-                    writer.write(html=f"<td class='right'>{len(space.pages_with_status(status))}")
-                space_sizes[space.key] = len(space.pages) + len(space.blog_posts)
+                    tdr(len(space.pages_with_status(status)))
+                space_sizes[space.key] = space.total_page_count()
+                likes = space.likes()
+                tdr(f"<span class='likes'>{likes}</span>" if likes else "")
+                latest_edit = space.latest_edit()
+                tdr(latest_edit.to_html() if latest_edit else "")
             anon = space.has_anonymous_read()
             logged = space.has_loggedin_read()
-            writer.write(html=f"<td>{anon}")
-            writer.write(html=f"<td>{logged}")
-            writer.write(html=f"<td>{PERM_SHORTHANDS[(anon, logged)]}")
-            writer.write(html=f"<td>{', '.join(map(html_for_name, space.admins()))}")
+            tdl(anon)
+            tdl(logged)
+            tdl(PERM_SHORTHANDS[(anon, logged)])
+            tdl(', '.join(map(html_for_name, space.admins())))
             writer.write("</tr>\n")
             if do_pages:
                 total_pages += len(space.pages)
@@ -531,9 +560,13 @@ def generate_all_space_pages(do_pages, html_dir='html'):
                 for status in OTHER_STATUSES:
                     status_totals[status] += len(space.pages_with_status(status))
         if do_pages:
-            writer.write(html=f"<tr><td>TOTAL: {len(spaces)}<td class='right'>{total_pages}<td class='right'>{total_restricted}<td class='right'>{total_posts}")
+            writer.write("<tr>")
+            tdl(f"TOTAL: {len(spaces)}")
+            tdr(total_pages)
+            tdr(total_restricted)
+            tdr(total_posts)
             for status in OTHER_STATUSES:
-                writer.write(html=f"<td class='right'>{status_totals[status]}")
+                tdr(status_totals[status])
             writer.write("</tr>")
         writer.write(html="</table>")
     if do_pages:
@@ -547,7 +580,7 @@ def generate_all_space_pages(do_pages, html_dir='html'):
                     writer.write(html=f"<tr> <td class='right'>{space.name}_blog </td> <td class='right'>{page.created.when} </td> <td class='right'>{page.lastedit.when} </td>  </td> <td class='right'>{page.lastedit.who} </td> </tr>")
             writer.write(html="</table>")
             writer.write(html=f"<script>{JAVASCRIPT}</script>")
-
+            writer.write("</table>")
     with open("space_sizes.json", "w") as f:
         json.dump(space_sizes, f)
 
@@ -578,13 +611,15 @@ PERM_SHORTHANDS = {
 @click.option('--all', 'all_spaces', is_flag=True, help="Examine all spaces")
 @click.option('--pages/--no-pages', default=True, help="Examine the page trees")
 @click.option('--htmldir', default='html', metavar="DIR", help="Directory to get the HTML results")
+@click.option('--skip-largest', type=int, default=0, metavar="N", help="Skip N largest spaces")
+@click.option('--skip-smallest', type=int, default=0, metavar="N", help="Skip N smallest spaces")
 @click.argument('space_keys', nargs=-1)
-def main(all_spaces, pages, htmldir, space_keys):
+def main(all_spaces, pages, htmldir, space_keys, skip_largest, skip_smallest):
     if all_spaces:
         if space_keys:
             click.echo("Can't specify space keys with --all")
             return
-        generate_all_space_pages(do_pages=pages, html_dir=htmldir)
+        generate_all_space_pages(do_pages=pages, html_dir=htmldir, skip_largest=skip_largest, skip_smallest=skip_smallest)
     elif space_keys:
         for space_key in space_keys:
             generate_space_page(Space(key=space_key), html_dir=htmldir)
