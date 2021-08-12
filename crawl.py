@@ -236,6 +236,9 @@ class Space:
     def root_pages(self):
         return (page for page in self.pages if page.parent is None)
 
+    def total_page_count(self):
+        return len(self.all_pages) + len(self.blog_posts)
+
     def has_anonymous_read(self):
         self.fetch_permissions()
         return any(p for p in self.permissions if permission_is_anonymous_read(p))
@@ -468,7 +471,7 @@ def generate_space_page(space, html_dir='html'):
     return num_restricted
 
 
-def generate_all_space_pages(do_pages, html_dir='html'):
+def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_smallest=0):
     try:
         with open("space_sizes.json") as f:
             space_sizes = json.load(f)
@@ -476,7 +479,7 @@ def generate_all_space_pages(do_pages, html_dir='html'):
         space_sizes = {}
 
     api_spaces = get_api_spaces(num_guess=len(space_sizes) or 200)
-    spaces = [Space(s) for s in api_spaces]
+    spaces = [Space(sd) for sd in api_spaces]
     for space in spaces:
         space.size = space_sizes.get(space.key, 1)
 
@@ -490,6 +493,8 @@ def generate_all_space_pages(do_pages, html_dir='html'):
 
     # Sort the spaces so that the largest spaces are first.
     spaces.sort(key=(lambda s: s.size), reverse=True)
+    # Skip some, for dev purposes.
+    spaces = spaces[skip_largest:(-skip_smallest if skip_smallest else None)]
 
     if do_pages:
         num_restricteds = {}
@@ -535,7 +540,7 @@ def generate_all_space_pages(do_pages, html_dir='html'):
                 tdr(len(space.blog_posts))
                 for status in OTHER_STATUSES:
                     tdr(len(space.pages_with_status(status)))
-                space_sizes[space.key] = len(space.pages) + len(space.blog_posts)
+                space_sizes[space.key] = space.total_page_count()
                 likes = space.likes()
                 tdr(f"<span class='likes'>{likes}</span>" if likes else "")
                 latest_edit = space.latest_edit()
@@ -578,13 +583,15 @@ PERM_SHORTHANDS = {
 @click.option('--all', 'all_spaces', is_flag=True, help="Examine all spaces")
 @click.option('--pages/--no-pages', default=True, help="Examine the page trees")
 @click.option('--htmldir', default='html', metavar="DIR", help="Directory to get the HTML results")
+@click.option('--skip-largest', type=int, default=0, metavar="N", help="Skip N largest spaces")
+@click.option('--skip-smallest', type=int, default=0, metavar="N", help="Skip N smallest spaces")
 @click.argument('space_keys', nargs=-1)
-def main(all_spaces, pages, htmldir, space_keys):
+def main(all_spaces, pages, htmldir, space_keys, skip_largest, skip_smallest):
     if all_spaces:
         if space_keys:
             click.echo("Can't specify space keys with --all")
             return
-        generate_all_space_pages(do_pages=pages, html_dir=htmldir)
+        generate_all_space_pages(do_pages=pages, html_dir=htmldir, skip_largest=skip_largest, skip_smallest=skip_smallest)
     elif space_keys:
         for space_key in space_keys:
             generate_space_page(Space(key=space_key), html_dir=htmldir)
