@@ -192,7 +192,8 @@ class Space:
         self.blog_posts = list(map(Page, self.get_api_pages(type="blogpost")))
 
         bar_label = f"Reading pages from {self.key}"
-        results = work_in_threads(self.pages, lambda p: p.fetch_page_information(), max_workers=6)
+        workers = 12 if len(self.pages) > 1000 else 4
+        results = work_in_threads(self.pages, lambda p: p.fetch_page_information(), max_workers=workers)
         with prog_bar(results, desc=bar_label, total=len(self.pages)) as bar:
             for page, _ in bar:
                 if page.parent_id:
@@ -227,7 +228,7 @@ class Space:
             if type == "page":
                 starts = list(range(0, self.size, chunk_size))
                 if starts:
-                    for _, content in work_in_threads(starts, self.get_api_pages_chunk, max_workers=6):
+                    for _, content in work_in_threads(starts, self.get_api_pages_chunk, max_workers=(self.size // 300)+1):
                         yield from handle_content(content)
                     start = starts[-1] + chunk_size
             while True:
@@ -505,7 +506,7 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
 
     if do_pages:
         num_restricteds = {}
-        work = work_in_threads(spaces, generate_space_page, max_workers=8)
+        work = work_in_threads(spaces, generate_space_page, max_workers=10)
         for space, num_restricted in prog_bar(work, desc="Reading spaces", total=len(spaces)):
             num_restricteds[space.key] = num_restricted
 
