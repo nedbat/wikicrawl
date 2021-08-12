@@ -534,7 +534,7 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
             writer.write("<th class='right'>Likes<th class='right'>Last Edit")
         writer.write("<th>Anon<th>Logged-in<th>Summary<th>Admins</tr>")
         status_totals = dict.fromkeys(OTHER_STATUSES, 0)
-        for space in sorted(spaces, key=lambda s: s.key):
+        for order, space in enumerate(sorted(spaces, key=lambda s: s.key)):
             if do_pages:
                 num_restricted = num_restricteds[space.key]
 
@@ -543,7 +543,7 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
             if space.name:
                 title += ": " + space.name
             space_name = prep_html(text=title, href=f"pages_{space.key}.html" if do_pages else None)
-            tdl(f"<span data={space.key}>{space_name}</span>")
+            tdl(f"<span data='{order}'>{space_name}</span>")
             if do_pages:
                 tdr(len(space.pages))
                 tdr(num_restricted)
