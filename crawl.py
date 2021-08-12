@@ -61,7 +61,7 @@ class Edit:
         return self.when < other.when
 
     def to_html(self):
-        html = f"<span class='edit'>"
+        html = f"<span class='edit' data='{self.when}'>"
         html += html_for_name(self.who)
         html += f"<span class='when'> ({html_for_datetime(self.when)})</span>"
         html += f"</span>"
@@ -541,7 +541,8 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
             title = space.key
             if space.name:
                 title += ": " + space.name
-            tdl(prep_html(text=title, href=f"pages_{space.key}.html" if do_pages else None))
+            space_name = prep_html(text=title, href=f"pages_{space.key}.html" if do_pages else None)
+            tdl(f"<span data={space.key}>{space_name}</span>")
             if do_pages:
                 tdr(len(space.pages))
                 tdr(num_restricted)
@@ -601,29 +602,46 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
     with open("space_sizes.json", "w") as f:
         json.dump(space_sizes, f)
 
-#A simple JS code to add sorting functionility to a HTML table:
-#Ref: https://stackoverflow.com/questions/14267781/sorting-html-table-with-javascript
-#getCellValue have been changed from the link above to relfect the dynamic type of table in space
+# A simple JS code to add sorting functionility to a HTML table:
+# Ref: https://stackoverflow.com/questions/14267781/sorting-html-table-with-javascript
+# getCellValue have been changed from the link above to relfect the dynamic type of table in space.
 JAVASCRIPT= """
 
 const getCellValue = (tr, idx) => {
-        if(tr.children[idx] === undefined) return false;
-        return tr.children[idx].innerText || tr.children[idx].textContent
+    const cell = tr.children[idx];
+    if (cell === undefined) {
+        return false;
+    }
+    if (cell.children.length > 0) {
+        if (cell.children[0].getAttribute("data")) {
+            return cell.children[0].getAttribute("data");
+        }
+    }
+    return cell.innerText || cell.textContent;
 };
 
 
-const comparer = (idx, asc) => (a, b) => ((v1, v2) =>
-    v1 !== '' && v2 !== '' && !isNaN(v1) && !isNaN(v2) ? v1 - v2 : v1.toString().localeCompare(v2)
-    )(getCellValue(asc ? a : b, idx), getCellValue(asc ? b : a, idx));
+const comparer = (idx, asc) => (a, b) => (
+    (v1, v2) => {
+        if (v1 !== '' && v2 !== '' && !isNaN(v1) && !isNaN(v2)) {
+            return v1 - v2;
+        }
+        else {
+            return v1.toString().localeCompare(v2);
+        }
+    })(getCellValue(asc ? a : b, idx), getCellValue(asc ? b : a, idx));
 
 // do the work...
-document.querySelectorAll('th').forEach(th => th.addEventListener('click', (() => {
-    const table = th.closest('table');
-    Array.from(table.querySelectorAll('tr:nth-child(n+2)'))
-        .sort(comparer(Array.from(th.parentNode.children).indexOf(th), this.asc = !this.asc))
-        .forEach(tr => table.appendChild(tr) );
-})));
+document.querySelectorAll('th').forEach(
+    th => th.addEventListener('click', (() => {
+        const table = th.closest('table');
+        Array.from(table.querySelectorAll('tr:nth-child(n+2)'))
+            .sort(comparer(Array.from(th.parentNode.children).indexOf(th), this.asc = !this.asc))
+            .forEach(tr => table.appendChild(tr));
+    }))
+);
 """
+
 PERM_SHORTHANDS = {
     (False, False): "Internal",
     (False, True): "Logged-in",
