@@ -15,6 +15,7 @@ from atlassian import Confluence
 
 import keys
 from htmlwriter import HtmlOutlineWriter, prep_html
+from get_visits import get_visits
 
 
 confluence = Confluence(username=keys.USER, password=keys.PASSWORD, url=keys.SITE)
@@ -98,6 +99,11 @@ class Page:
             )
         else:
             self.lastedit = None
+
+        if 'CLOUD_SESSION_TOKEN' in dir(keys):
+            self.visits = get_visits(self.id, keys.CLOUD_SESSION_TOKEN)
+        else:
+            self.visits = None
         metadata = api_page.get("metadata", {})
         self.labels = [res["label"] for res in metadata.get("labels", {}).get("results", [])]
         self.likes = metadata.get("likes", {}).get("count", 0)
