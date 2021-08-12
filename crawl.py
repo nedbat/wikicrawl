@@ -554,14 +554,15 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
         total_posts = 0
         writer = HtmlOutlineWriter(fout, style=SPACES_STYLE, title="All spaces")
         writer.write("<table>")
-        writer.write("<tr><th>Space")
+        writer.write("<thead><tr><th>Space")
         if do_pages:
             writer.write("<th class='right'>Pages<th class='right'>Restricted<th class='right'>Blog Posts")
             for status in OTHER_STATUSES:
                 writer.write(f"<th class='right'>{status.title()}")
             writer.write("<th class='right'>Visits<th class='right'>Likes<th class='right'>Last Edit")
         writer.write("<th>Anon<th>Logged-in<th>Summary<th>Admins")
-        writer.write("</tr>")
+        writer.write("</tr></thead>")
+        writer.write("<tbody>")
         status_totals = dict.fromkeys(OTHER_STATUSES, 0)
         for order, space in enumerate(sorted(spaces, key=lambda s: s.key)):
             if do_pages:
@@ -597,22 +598,24 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
                 total_posts += len(space.blog_posts)
                 for status in OTHER_STATUSES:
                     status_totals[status] += len(space.pages_with_status(status))
+        writer.write("</tbody>")
         if do_pages:
-            writer.write("<tfoot>")
+            writer.write("<tfoot><tr>")
             tdl(f"TOTAL: {len(spaces)}")
             tdr(total_pages)
             tdr(total_restricted)
             tdr(total_posts)
             for status in OTHER_STATUSES:
                 tdr(status_totals[status])
-            writer.write("</tfoot>")
+            writer.write("</tr></tfoot>")
         writer.write(html="</table>")
         writer.write(html=f"<script>{JAVASCRIPT}</script>")
 
     if do_pages:
         with open_for_writing(f"{html_dir}/all_spaces_pages.html") as fout:
             writer = HtmlOutlineWriter(fout, style=SPACES_STYLE, title="All space pages")
-            writer.write(html="<table><tr><th>Created</th><th>Last Edited</th><th>Last Edited by:</th><th>Views</th><th>Likes</th><th>Space</th><th>Type</th><th>Page</th></tr>")
+            writer.write(html="<table><thead><tr><th>Created</th><th>Last Edited</th><th>Last Edited by:</th><th>Views</th><th>Likes</th><th>Space</th><th>Type</th><th>Page</th></tr></thead>")
+            writer.write("<tbody>")
             for space in spaces:
                 for page in itertools.chain(space.all_pages, space.blog_posts):
                     if page.created is None:
@@ -627,9 +630,8 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
                     tdl(page.type)
                     tdl(page.html_for_name())
                     writer.write("</tr>")
-            writer.write(html="</table>")
+            writer.write(html="</tbody></table>")
             writer.write(html=f"<script>{JAVASCRIPT}</script>")
-            writer.write("</table>")
 
     with open("space_sizes.json", "w") as f:
         json.dump(space_sizes, f)
@@ -666,10 +668,10 @@ const comparer = (idx, asc) => (a, b) => (
 // do the work...
 document.querySelectorAll('th').forEach(
     th => th.addEventListener('click', (() => {
-        const table = th.closest('table');
-        Array.from(table.querySelectorAll('tr:nth-child(n+2)'))
+        const tbody = th.closest('table').querySelector('tbody');
+        Array.from(tbody.querySelectorAll('tr'))
             .sort(comparer(Array.from(th.parentNode.children).indexOf(th), this.asc = !this.asc))
-            .forEach(tr => table.appendChild(tr));
+            .forEach(tr => tbody.appendChild(tr));
     }))
 );
 """
