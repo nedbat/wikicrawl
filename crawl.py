@@ -46,13 +46,16 @@ def html_for_name(name):
     name, deactivated = remove_end(name, " (Deactivated)")
     deadclass = " deactivated" if deactivated else ""
     deadmark = "<sup>&#x2020;</sup>" if deactivated else ""
-    html = f"<span class='who{deadclass}'>{name}{deadmark}</span>"
+    html = f"<span class='who{deadclass}'>{prep_html(text=name)}{deadmark}</span>"
     return html
 
 class Edit:
     def __init__(self, who, when):
         self.who = who
         self.when = datetime.datetime.fromisoformat(when.rstrip("Z"))
+
+    def __lt__(self, other):
+        return self.when < other.when
 
     def to_html(self):
         html = f"<span class='edit'>"
@@ -251,6 +254,12 @@ class Space:
         # Sort them, but always put "administrators" first.
         return sorted(not_boring, key=lambda n: "" if n == "administrators" else n)
 
+    def likes(self):
+        return sum(page.likes for page in self.pages)
+
+    def latest_edit(self):
+        return max((page.lastedit for page in self.pages), default=None)
+
 BORING_ADMINS = {
     "Chat Notifications",
     "Copy Space for Confluence",
@@ -416,7 +425,7 @@ sup { vertical-align: top; font-size: 0.6em; }
     display: inline-block; margin-left: .5em; font-size: 85%; border: 1px solid #888;
     padding: 0 .25em; border-radius: .15em; background: #f0f0f0;
     }
-.likes { border: 1px solid blue; border-radius: 1em; font-size: 80%; min-width: 1em; display: inline-block; text-align: center; background: #ddf; }
+.likes { border: 1px solid blue; border-radius: 1em; font-size: 80%; padding: .1em .25em 0 .25em; display: inline-block; text-align: center; background: #ddf; }
 """
 
 SPACES_STYLE = """
@@ -498,6 +507,7 @@ def generate_all_space_pages(do_pages, html_dir='html'):
             writer.write(html="<th class='right'>Pages<th class='right'>Restricted<th class='right'>Blog Posts")
             for status in OTHER_STATUSES:
                 writer.write(html=f"<th class='right'>{status.title()}")
+            writer.write(html="<th class='right'>Likes<th class='right'>Last Edit")
         writer.write(html="<th>Anon<th>Logged-in<th>Summary<th>Admins</tr>")
         status_totals = dict.fromkeys(OTHER_STATUSES, 0)
         for space in sorted(spaces, key=lambda s: s.key):
@@ -517,6 +527,14 @@ def generate_all_space_pages(do_pages, html_dir='html'):
                 for status in OTHER_STATUSES:
                     writer.write(html=f"<td class='right'>{len(space.pages_with_status(status))}")
                 space_sizes[space.key] = len(space.pages) + len(space.blog_posts)
+                likes = space.likes()
+                writer.write(html="<td class='right'>")
+                if likes:
+                    writer.write(html=f"<span class='likes'>{likes}</span>")
+                latest_edit = space.latest_edit()
+                writer.write(html=f"<td class='right'>")
+                if latest_edit:
+                    writer.write(html=latest_edit.to_html())
             anon = space.has_anonymous_read()
             logged = space.has_loggedin_read()
             writer.write(html=f"<td>{anon}")
