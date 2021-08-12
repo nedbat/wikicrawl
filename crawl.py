@@ -496,19 +496,29 @@ def generate_all_space_pages(do_pages, html_dir='html'):
         for space, num_restricted in work_in_threads(spaces, generate_space_page, max_workers=8):
             num_restricteds[space.key] = num_restricted
 
+    def tdl(html):
+        writer.write("<td>")
+        writer.write(str(html))
+        writer.write("</td>")
+
+    def tdr(html):
+        writer.write("<td class='right'>")
+        writer.write(str(html))
+        writer.write("</td>")
+
     with open_for_writing(f"{html_dir}/spaces.html") as fout:
         total_pages = 0
         total_restricted = 0
         total_posts = 0
         writer = HtmlOutlineWriter(fout, style=SPACES_STYLE, title="All spaces")
-        writer.write(html="<table>")
-        writer.write(html="<tr><th>Space")
+        writer.write("<table>")
+        writer.write("<tr><th>Space")
         if do_pages:
-            writer.write(html="<th class='right'>Pages<th class='right'>Restricted<th class='right'>Blog Posts")
+            writer.write("<th class='right'>Pages<th class='right'>Restricted<th class='right'>Blog Posts")
             for status in OTHER_STATUSES:
-                writer.write(html=f"<th class='right'>{status.title()}")
-            writer.write(html="<th class='right'>Likes<th class='right'>Last Edit")
-        writer.write(html="<th>Anon<th>Logged-in<th>Summary<th>Admins</tr>")
+                writer.write(f"<th class='right'>{status.title()}")
+            writer.write("<th class='right'>Likes<th class='right'>Last Edit")
+        writer.write("<th>Anon<th>Logged-in<th>Summary<th>Admins</tr>")
         status_totals = dict.fromkeys(OTHER_STATUSES, 0)
         for space in sorted(spaces, key=lambda s: s.key):
             if do_pages:
@@ -518,29 +528,24 @@ def generate_all_space_pages(do_pages, html_dir='html'):
             title = space.key
             if space.name:
                 title += ": " + space.name
-            title = prep_html(text=title, href=f"pages_{space.key}.html" if do_pages else None)
-            writer.write(html=f"<td>{title}")
+            tdl(prep_html(text=title, href=f"pages_{space.key}.html" if do_pages else None))
             if do_pages:
-                writer.write(html=f"<td class='right'>{len(space.pages)}")
-                writer.write(html=f"<td class='right'>{num_restricted}")
-                writer.write(html=f"<td class='right'>{len(space.blog_posts)}")
+                tdr(len(space.pages))
+                tdr(num_restricted)
+                tdr(len(space.blog_posts))
                 for status in OTHER_STATUSES:
-                    writer.write(html=f"<td class='right'>{len(space.pages_with_status(status))}")
+                    tdr(len(space.pages_with_status(status)))
                 space_sizes[space.key] = len(space.pages) + len(space.blog_posts)
                 likes = space.likes()
-                writer.write(html="<td class='right'>")
-                if likes:
-                    writer.write(html=f"<span class='likes'>{likes}</span>")
+                tdr(f"<span class='likes'>{likes}</span>" if likes else "")
                 latest_edit = space.latest_edit()
-                writer.write(html=f"<td class='right'>")
-                if latest_edit:
-                    writer.write(html=latest_edit.to_html())
+                tdr(latest_edit.to_html() if latest_edit else "")
             anon = space.has_anonymous_read()
             logged = space.has_loggedin_read()
-            writer.write(html=f"<td>{anon}")
-            writer.write(html=f"<td>{logged}")
-            writer.write(html=f"<td>{PERM_SHORTHANDS[(anon, logged)]}")
-            writer.write(html=f"<td>{', '.join(map(html_for_name, space.admins()))}")
+            tdl(anon)
+            tdl(logged)
+            tdl(PERM_SHORTHANDS[(anon, logged)])
+            tdl(', '.join(map(html_for_name, space.admins())))
             writer.write("</tr>\n")
             if do_pages:
                 total_pages += len(space.pages)
@@ -549,11 +554,15 @@ def generate_all_space_pages(do_pages, html_dir='html'):
                 for status in OTHER_STATUSES:
                     status_totals[status] += len(space.pages_with_status(status))
         if do_pages:
-            writer.write(html=f"<tr><td>TOTAL: {len(spaces)}<td class='right'>{total_pages}<td class='right'>{total_restricted}<td class='right'>{total_posts}")
+            writer.write("<tr>")
+            tdl(f"TOTAL: {len(spaces)}")
+            tdr(total_pages)
+            tdr(total_restricted)
+            tdr(total_posts)
             for status in OTHER_STATUSES:
-                writer.write(html=f"<td class='right'>{status_totals[status]}")
+                tdr(status_totals[status])
             writer.write("</tr>")
-        writer.write(html="</table>")
+        writer.write("</table>")
 
     with open("space_sizes.json", "w") as f:
         json.dump(space_sizes, f)
