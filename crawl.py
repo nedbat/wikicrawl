@@ -568,11 +568,46 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
             for status in OTHER_STATUSES:
                 tdr(status_totals[status])
             writer.write("</tr>")
-        writer.write("</table>")
-
+        writer.write(html="</table>")
+        writer.write(html=f"<script>{JAVASCRIPT}</script>")
+    if do_pages:
+        with open_for_writing(f"{html_dir}/all_spaces_pages.html") as fout:
+            writer = HtmlOutlineWriter(fout, style=SPACES_STYLE, title="All spaces pages") 
+            writer.write(html="<table><tr><th>Space </th> <th> Created </th> <th> Last Edited </th> <th> Last Edited by: </th>  </tr>")
+            for space in spaces:
+                for page in space.all_pages:
+                    writer.write(html=f"<tr> <td class='right'>{space.name}_page </td> <td class='right'>{page.created.when} </td> <td class='right'>{page.lastedit.when} </td>  </td> <td class='right'>{page.lastedit.who} </td> </tr>")
+                for page in space.blog_posts:
+                    writer.write(html=f"<tr> <td class='right'>{space.name}_blog </td> <td class='right'>{page.created.when} </td> <td class='right'>{page.lastedit.when} </td>  </td> <td class='right'>{page.lastedit.who} </td> </tr>")
+            writer.write(html="</table>")
+            writer.write(html=f"<script>{JAVASCRIPT}</script>")
+            writer.write("</table>")
     with open("space_sizes.json", "w") as f:
         json.dump(space_sizes, f)
 
+#A simple JS code to add sorting functionility to a HTML table:
+#Ref: https://stackoverflow.com/questions/14267781/sorting-html-table-with-javascript
+#getCellValue have been changed from the link above to relfect the dynamic type of table in space
+JAVASCRIPT= """
+
+const getCellValue = (tr, idx) => {
+        if(tr.children[idx] === undefined) return false;
+        return tr.children[idx].innerText || tr.children[idx].textContent
+};
+
+
+const comparer = (idx, asc) => (a, b) => ((v1, v2) => 
+    v1 !== '' && v2 !== '' && !isNaN(v1) && !isNaN(v2) ? v1 - v2 : v1.toString().localeCompare(v2)
+    )(getCellValue(asc ? a : b, idx), getCellValue(asc ? b : a, idx));
+
+// do the work...
+document.querySelectorAll('th').forEach(th => th.addEventListener('click', (() => {
+    const table = th.closest('table');
+    Array.from(table.querySelectorAll('tr:nth-child(n+2)'))
+        .sort(comparer(Array.from(th.parentNode.children).indexOf(th), this.asc = !this.asc))
+        .forEach(tr => table.appendChild(tr) );
+})));
+"""
 PERM_SHORTHANDS = {
     (False, False): "Internal",
     (False, True): "Logged-in",
