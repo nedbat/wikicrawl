@@ -539,12 +539,12 @@ def generate_all_space_pages(do_pages, html_dir='html'):
     if do_pages:
         with open_for_writing(f"{html_dir}/all_spaces_pages.html") as fout:
             writer = HtmlOutlineWriter(fout, style=SPACES_STYLE, title="All spaces pages") 
-            writer.write(html="<table><tr><th>Space </th> <th> Created at </th> <th> Last Edited </th> </tr>")
+            writer.write(html="<table><tr><th>Space </th> <th> Created </th> <th> Last Edited </th> <th> Last Edited by: </th>  </tr>")
             for space in spaces:
                 for page in space.all_pages:
-                    writer.write(html=f"<tr> <td class='right'>{space.name} </td> <td class='right'>{page.created.when} </td> <td class='right'>{page.lastedit.when} </td>  </tr>")
+                    writer.write(html=f"<tr> <td class='right'>{space.name}_page </td> <td class='right'>{page.created.when} </td> <td class='right'>{page.lastedit.when} </td>  </td> <td class='right'>{page.lastedit.who} </td> </tr>")
                 for page in space.blog_posts:
-                    writer.write(html=f"<tr> <td class='right'>{space.name} </td> <td class='right'>{page.created.when} </td> <td class='right'>{page.lastedit.when} </td>  </tr>")
+                    writer.write(html=f"<tr> <td class='right'>{space.name}_blog </td> <td class='right'>{page.created.when} </td> <td class='right'>{page.lastedit.when} </td>  </td> <td class='right'>{page.lastedit.who} </td> </tr>")
             writer.write(html="</table>")
             writer.write(html=f"<script>{JAVASCRIPT}</script>")
 
