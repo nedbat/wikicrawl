@@ -448,6 +448,12 @@ SPACES_STYLE = """
     td.right, th.right {
         text-align: right;
     }
+    th {
+        position: sticky;
+        top: 0;
+        background: white;
+        border-bottom: 1px solid #888;
+    }
 """ + STYLE
 
 OTHER_STATUSES = ["draft", "archived", "trashed"]
