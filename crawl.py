@@ -569,6 +569,7 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
                 tdr(status_totals[status])
             writer.write("</tr>")
         writer.write(html="</table>")
+        writer.write(html=f"<script>{JAVASCRIPT}</script>")
     if do_pages:
         with open_for_writing(f"{html_dir}/all_spaces_pages.html") as fout:
             writer = HtmlOutlineWriter(fout, style=SPACES_STYLE, title="All spaces pages") 
@@ -586,7 +587,14 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
 
 #A simple JS code to add sorting functionility to a HTML table:
 #Ref: https://stackoverflow.com/questions/14267781/sorting-html-table-with-javascript
-JAVASCRIPT= """const getCellValue = (tr, idx) => tr.children[idx].innerText || tr.children[idx].textContent;
+#getCellValue have been changed from the link above to relfect the dynamic type of table in space
+JAVASCRIPT= """
+
+const getCellValue = (tr, idx) => {
+        if(tr.children[idx] === undefined) return false;
+        return tr.children[idx].innerText || tr.children[idx].textContent
+};
+
 
 const comparer = (idx, asc) => (a, b) => ((v1, v2) => 
     v1 !== '' && v2 !== '' && !isNaN(v1) && !isNaN(v2) ? v1 - v2 : v1.toString().localeCompare(v2)
