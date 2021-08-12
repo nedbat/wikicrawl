@@ -49,6 +49,9 @@ def html_for_name(name):
     html = f"<span class='who{deadclass}'>{prep_html(text=name)}{deadmark}</span>"
     return html
 
+def html_for_datetime(when):
+    return format(when, "%Y-%m-%d")
+
 class Edit:
     def __init__(self, who, when):
         self.who = who
@@ -60,7 +63,7 @@ class Edit:
     def to_html(self):
         html = f"<span class='edit'>"
         html += html_for_name(self.who)
-        html += f"<span class='when'> ({self.when:%Y-%m-%d})</span>"
+        html += f"<span class='when'> ({html_for_datetime(self.when)})</span>"
         html += f"</span>"
         return html
 
@@ -132,6 +135,14 @@ class Page:
 
     def descendants(self):
         return 1 + sum(c.descendants() for c in self.children)
+
+    def html_for_name(self):
+        if self.url:
+            href = keys.SITE + self.url
+        else:
+            href = None
+        html = prep_html(text=self.title, href=href)
+        return html
 
 
 def work_in_threads(seq, fn, max_workers=10):
@@ -356,11 +367,7 @@ def write_page(writer, page, parent_restricted=False):
     Returns number of restricted pages.
     """
     num_restricted = 0
-    if page.url:
-        href = keys.SITE + page.url
-    else:
-        href = None
-    html = prep_html(text=page.title, href=href)
+    html = page.html_for_name()
     if page.restrictions:
         html = prep_html(html=html, klass="restricted")
         limits = sorted(itertools.chain.from_iterable(page.restrictions))
@@ -570,18 +577,27 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
             writer.write("</tr>")
         writer.write(html="</table>")
         writer.write(html=f"<script>{JAVASCRIPT}</script>")
+
     if do_pages:
         with open_for_writing(f"{html_dir}/all_spaces_pages.html") as fout:
-            writer = HtmlOutlineWriter(fout, style=SPACES_STYLE, title="All spaces pages") 
-            writer.write(html="<table><tr><th>Space </th> <th> Created </th> <th> Last Edited </th> <th> Last Edited by: </th>  </tr>")
+            writer = HtmlOutlineWriter(fout, style=SPACES_STYLE, title="All space pages")
+            writer.write(html="<table><tr><th>Created</th><th>Last Edited</th><th>Last Edited by:</th><th>Space</th><th>Type</th><th>Page</th></tr>")
             for space in spaces:
-                for page in space.all_pages:
-                    writer.write(html=f"<tr> <td class='right'>{space.name}_page </td> <td class='right'>{page.created.when} </td> <td class='right'>{page.lastedit.when} </td>  </td> <td class='right'>{page.lastedit.who} </td> </tr>")
-                for page in space.blog_posts:
-                    writer.write(html=f"<tr> <td class='right'>{space.name}_blog </td> <td class='right'>{page.created.when} </td> <td class='right'>{page.lastedit.when} </td>  </td> <td class='right'>{page.lastedit.who} </td> </tr>")
+                for page in itertools.chain(space.all_pages, space.blog_posts):
+                    if page.created is None:
+                        continue
+                    writer.write("<tr>")
+                    tdr(html_for_datetime(page.created.when))
+                    tdr(html_for_datetime(page.lastedit.when))
+                    tdl(html_for_name(page.lastedit.who))
+                    tdl(space.key)
+                    tdl(page.type)
+                    tdl(page.html_for_name())
+                    writer.write("</tr>")
             writer.write(html="</table>")
             writer.write(html=f"<script>{JAVASCRIPT}</script>")
             writer.write("</table>")
+
     with open("space_sizes.json", "w") as f:
         json.dump(space_sizes, f)
 
@@ -596,7 +612,7 @@ const getCellValue = (tr, idx) => {
 };
 
 
-const comparer = (idx, asc) => (a, b) => ((v1, v2) => 
+const comparer = (idx, asc) => (a, b) => ((v1, v2) =>
     v1 !== '' && v2 !== '' && !isNaN(v1) && !isNaN(v2) ? v1 - v2 : v1.toString().localeCompare(v2)
     )(getCellValue(asc ? a : b, idx), getCellValue(asc ? b : a, idx));
 
