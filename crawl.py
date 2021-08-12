@@ -575,14 +575,14 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
                 for status in OTHER_STATUSES:
                     status_totals[status] += len(space.pages_with_status(status))
         if do_pages:
-            writer.write("<tr>")
+            writer.write("<tfoot>")
             tdl(f"TOTAL: {len(spaces)}")
             tdr(total_pages)
             tdr(total_restricted)
             tdr(total_posts)
             for status in OTHER_STATUSES:
                 tdr(status_totals[status])
-            writer.write("</tr>")
+            writer.write("</tfoot>")
         writer.write(html="</table>")
         writer.write(html=f"<script>{JAVASCRIPT}</script>")
 
