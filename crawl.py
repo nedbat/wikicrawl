@@ -184,7 +184,7 @@ class Space:
                     try:
                         page.parent = pages_by_id[page.parent_id]
                     except:
-                        bar.write(f"No parent for page in {self.key}: {page}")
+                        write_message(f"No parent for page in {self.key}: {page}")
                     else:
                         page.parent.children.append(page)
 
@@ -560,6 +560,34 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
                     tdl(page.html_for_name())
                     writer.write("</tr>")
             writer.write(html="</tbody></table>")
+            writer.write(html=f"<script>{JAVASCRIPT}</script>")
+
+    if do_pages:
+        with open_for_writing(f"{html_dir}/authors.html") as fout:
+            writer = HtmlOutlineWriter(fout, stylefile="style.css", title="Authors")
+            authors = collections.defaultdict(list)
+            for space in spaces:
+                for page in itertools.chain(space.all_pages, space.blog_posts):
+                    if page.created:
+                        authors[page.created.who].append(page)
+            writer.write(html="<table><thead><tr><th>Who</th><th>Num created</th><th>First</th><th>When</th><th>Last</th><th>When</th></tr></thead>")
+            writer.write("<tbody>")
+            for author, pages in sorted(authors.items()):
+                writer.write("<tr>")
+                tdl(html_for_name(author))
+                tdr(len(pages))
+                first = min(pages, key=lambda p:p.created.when)
+                tdl(first.html_for_name())
+                tdr(html_for_datetime(first.created.when))
+                if len(pages) > 1:
+                    last = max(pages, key=lambda p:p.created.when)
+                    tdl(last.html_for_name())
+                    tdr(html_for_datetime(last.created.when))
+                else:
+                    tdl("&mdash;")
+                    tdr("&mdash;")
+                writer.write("</tr>")
+            writer.write("</tbody></table>")
             writer.write(html=f"<script>{JAVASCRIPT}</script>")
 
 
