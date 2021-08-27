@@ -84,11 +84,15 @@ class HtmlOutlineWriter(object):
 
     SECTION_END = "</div></div>"
 
-    def __init__(self, fout, title="", style=""):
+    def __init__(self, fout, title="", style="", stylefile=""):
         self.fout = fout
         self.section_ids = itertools.count()
         self.write(html=self.HEAD)
-        self.write(html=style)
+        if style:
+            self.write(html=style)
+        if stylefile:
+            with open(stylefile) as css:
+                self.write(html=css.read())
         self.write(html=self.STYLE_END)
         if title:
             self.write(html=f"<title>{title}</title>")

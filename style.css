@@ -1,0 +1,36 @@
+.restricted { background: #ffcccc; padding: 2px; margin-left: -2px; }
+.parent_restricted { background: #ffff44; padding: 2px; margin-left: -2px; }
+.status { font-style: italic; color: #666; }
+.count { display: inline-block; margin-left: 1em; font-size: 85%; color: #666; }
+.edits { display: inline-block; margin-left: 1em; }
+.deactivated { color: #666; }
+sup { vertical-align: top; font-size: 0.6em; }
+.label {
+    display: inline-block; margin-left: .5em; font-size: 85%; border: 1px solid #888;
+    padding: 0 .25em; border-radius: .15em; background: #f0f0f0;
+    }
+.visits { font-weight: bold; }
+.likes {
+    border: 1px solid blue;
+    border-radius: 1em;
+    font-size: 80%;
+    padding: .1em .25em 0 .25em;
+    display: inline-block;
+    text-align: center;
+    background: #ddf;
+}
+
+td, th {
+    padding: .25em .5em;
+    text-align: left;
+    vertical-align: top;
+}
+td.right, th.right {
+    text-align: right;
+}
+th {
+    position: sticky;
+    top: 0;
+    background: white;
+    border-bottom: 1px solid #888;
+}

@@ -403,45 +403,12 @@ def open_for_writing(path):
     return open(path, "w")
 
 
-STYLE = """
-.restricted { background: #ffcccc; padding: 2px; margin-left: -2px; }
-.parent_restricted { background: #ffff44; padding: 2px; margin-left: -2px; }
-.status { font-style: italic; color: #666; }
-.count { display: inline-block; margin-left: 1em; font-size: 85%; color: #666; }
-.edits { display: inline-block; margin-left: 1em; }
-.deactivated { color: #666; }
-sup { vertical-align: top; font-size: 0.6em; }
-.label {
-    display: inline-block; margin-left: .5em; font-size: 85%; border: 1px solid #888;
-    padding: 0 .25em; border-radius: .15em; background: #f0f0f0;
-    }
-.visits { font-weight: bold; }
-.likes { border: 1px solid blue; border-radius: 1em; font-size: 80%; padding: .1em .25em 0 .25em; display: inline-block; text-align: center; background: #ddf; }
-"""
-
-SPACES_STYLE = """
-    td, th {
-        padding: .25em .5em;
-        text-align: left;
-        vertical-align: top;
-    }
-    td.right, th.right {
-        text-align: right;
-    }
-    th {
-        position: sticky;
-        top: 0;
-        background: white;
-        border-bottom: 1px solid #888;
-    }
-""" + STYLE
-
 OTHER_STATUSES = ["draft", "archived", "trashed"]
 
 def generate_space_page(space, html_dir='html'):
     space.fetch_pages()
     with open_for_writing(f"{html_dir}/pages_{space.key}.html") as fout:
-        writer = HtmlOutlineWriter(fout, style=STYLE, title=f"{space.key} space")
+        writer = HtmlOutlineWriter(fout, stylefile="style.css", title=f"{space.key} space")
         writer.write(html="<h1>")
         writer.write(text=space.key)
         writer.write(html="</h1>")
@@ -494,6 +461,12 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
         for space, num_restricted in prog_bar(work, desc="Reading spaces", total=len(spaces)):
             num_restricteds[space.key] = num_restricted
 
+    with open("space_sizes.json", "w") as f:
+        json.dump(space_sizes, f)
+
+    with open("sort.js") as sortjs:
+        JAVASCRIPT = sortjs.read()
+
     def tdl(html):
         writer.write("<td>")
         writer.write(str(html))
@@ -508,7 +481,7 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
         total_pages = 0
         total_restricted = 0
         total_posts = 0
-        writer = HtmlOutlineWriter(fout, style=SPACES_STYLE, title="All spaces")
+        writer = HtmlOutlineWriter(fout, stylefile="style.css", title="All spaces")
         writer.write("<table>")
         writer.write("<thead><tr><th>Space")
         if do_pages:
@@ -569,7 +542,7 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
 
     if do_pages:
         with open_for_writing(f"{html_dir}/all_spaces_pages.html") as fout:
-            writer = HtmlOutlineWriter(fout, style=SPACES_STYLE, title="All space pages")
+            writer = HtmlOutlineWriter(fout, stylefile="style.css", title="All space pages")
             writer.write(html="<table><thead><tr><th>Created</th><th>Last Edited</th><th>Last Edited by:</th><th>Views</th><th>Likes</th><th>Space</th><th>Type</th><th>Page</th></tr></thead>")
             writer.write("<tbody>")
             for space in spaces:
@@ -589,48 +562,6 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
             writer.write(html="</tbody></table>")
             writer.write(html=f"<script>{JAVASCRIPT}</script>")
 
-    with open("space_sizes.json", "w") as f:
-        json.dump(space_sizes, f)
-
-# A simple JS code to add sorting functionility to a HTML table:
-# Ref: https://stackoverflow.com/questions/14267781/sorting-html-table-with-javascript
-# getCellValue have been changed from the link above to relfect the dynamic type of table in space.
-JAVASCRIPT= """
-
-const getCellValue = (tr, idx) => {
-    const cell = tr.children[idx];
-    if (cell === undefined) {
-        return false;
-    }
-    if (cell.children.length > 0) {
-        if (cell.children[0].getAttribute("data")) {
-            return cell.children[0].getAttribute("data");
-        }
-    }
-    return cell.innerText || cell.textContent;
-};
-
-
-const comparer = (idx, asc) => (a, b) => (
-    (v1, v2) => {
-        if (v1 !== '' && v2 !== '' && !isNaN(v1) && !isNaN(v2)) {
-            return v1 - v2;
-        }
-        else {
-            return v1.toString().localeCompare(v2);
-        }
-    })(getCellValue(asc ? a : b, idx), getCellValue(asc ? b : a, idx));
-
-// do the work...
-document.querySelectorAll('th').forEach(
-    th => th.addEventListener('click', (() => {
-        const tbody = th.closest('table').querySelector('tbody');
-        Array.from(tbody.querySelectorAll('tr'))
-            .sort(comparer(Array.from(th.parentNode.children).indexOf(th), this.asc = !this.asc))
-            .forEach(tr => tbody.appendChild(tr));
-    }))
-);
-"""
 
 PERM_SHORTHANDS = {
     (False, False): "Internal",
