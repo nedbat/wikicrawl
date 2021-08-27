@@ -1,6 +1,4 @@
 import collections
-import concurrent.futures
-import contextlib
 import datetime
 import itertools
 import json
@@ -10,16 +8,15 @@ import re
 
 import click
 import requests.exceptions
-import tqdm
 from atlassian import Confluence
 
 import keys
-from htmlwriter import HtmlOutlineWriter, prep_html
 from get_visits import get_visits
+from htmlwriter import HtmlOutlineWriter, prep_html
+from work import prog_bar, report_http_errors, work_in_threads, write_message
 
 
 confluence = Confluence(username=keys.USER, password=keys.PASSWORD, url=keys.SITE)
-
 
 def scrub_title(title):
     return re.sub(r"[^a-z0-9 ]", "", title.lower()).strip()
@@ -39,9 +36,6 @@ def remove_end(text, end):
         return text[:-len(end)], True
     else:
         return text, False
-
-def prog_bar(seq=None, desc="", **kwargs):
-    return tqdm.tqdm(seq, desc=desc.ljust(35), leave=False, **kwargs)
 
 def html_for_name(name):
     name, deactivated = remove_end(name, " (Deactivated)")
@@ -71,7 +65,7 @@ class Edit:
 
 class Page:
     def __init__(self, api_page):
-        #tqdm.tqdm.write(json.dumps(api_page, indent=4))
+        #write_message(json.dumps(api_page, indent=4))
         self.id = api_page.get('id')
         self.type = api_page['type']
         self.status = api_page['status']
@@ -153,25 +147,6 @@ class Page:
         return html
 
 
-def work_in_threads(seq, fn, max_workers=10):
-    """Distribute work to threads.
-
-    `seq` is a sequence (probably list) of items.
-    `fn` is a function that will be called on each item, on worker threads.
-    `max_workers` is the maximum number of worker threads.
-
-    This function will yield pairs of (item, fn(item)) as the work is completed.
-    """
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_item = {executor.submit(fn, item): item for item in seq}
-        for future in concurrent.futures.as_completed(future_to_item):
-            if future.exception() is not None:
-                tqdm.tqdm.write(f"Exception in future: {future.exception()}")
-                continue
-            item = future_to_item[future]
-            yield item, future.result()
-
-
 class Space:
     def __init__(self, api_space=None, key=None):
         self.key = key or api_space['key']
@@ -230,7 +205,7 @@ class Space:
         with prog_bar(desc=desc) as bar:
             start = 0
             def handle_content(content):
-                #tqdm.tqdm.write(json.dumps(content, indent=4))
+                #write_message(json.dumps(content, indent=4))
                 yield from content
                 bar.update(len(content))
 
@@ -328,17 +303,6 @@ def name_for_permission(p):
         else:
             name = user_name(subjects['user']['results'][0])
     return name
-
-
-@contextlib.contextmanager
-def report_http_errors():
-    """Wrap around api calls, so that HTTP errors will be reported usefully."""
-    try:
-        yield
-    except requests.exceptions.HTTPError as err:
-        resp = err.response
-        tqdm.tqdm.write(f"Request for {resp.url!r} failed: status {resp.status_code}")
-        raise
 
 
 def get_api_spaces_chunk(start):
