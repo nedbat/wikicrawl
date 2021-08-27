@@ -22,7 +22,7 @@ confluence = Confluence(username=keys.USER, password=keys.PASSWORD, url=keys.SIT
 
 
 def scrub_title(title):
-    return re.sub(r"[^a-z ]", "", title.lower()).strip()
+    return re.sub(r"[^a-z0-9 ]", "", title.lower()).strip()
 
 def user_name(user_info):
     for key in ['username', 'displayName', 'publicName', 'email', 'accountId']:
