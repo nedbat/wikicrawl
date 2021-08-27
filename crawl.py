@@ -519,14 +519,6 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
     for space in spaces:
         space.size = space_sizes.get(space.key, 1)
 
-    try:
-        with open("space_sizes.json") as f:
-            space_sizes = json.load(f)
-        for space in spaces:
-            space.size = space_sizes.get(space.key, 1)
-    except:
-        space_sizes = {}
-
     # Sort the spaces so that the largest spaces are first.
     spaces.sort(key=(lambda s: s.size), reverse=True)
     # Skip some, for dev purposes.
