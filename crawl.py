@@ -358,10 +358,10 @@ def write_page(writer, page, parent_restricted=False):
         this_restricted = False
 
     if page.visits:
-        html += f" <span class='visits'>{page.visits}</span>"
+        html += " " + html_for_visits(page.visits)
 
     if page.likes > 0:
-        html += f" <span class='likes'>{page.likes}</span>"
+        html += " " + html_for_likes(page.likes)
 
     if page.status != "current":
         html += f" <span class='status'>[{page.status}]</span>"
