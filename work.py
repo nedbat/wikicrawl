@@ -38,7 +38,7 @@ def work_in_threads(seq, fn, max_workers=10):
 
 
 def prog_bar(seq=None, desc="", **kwargs):
-    return tqdm.tqdm(seq, desc=desc.ljust(35), leave=False, **kwargs)
+    return tqdm.tqdm(seq, desc=desc.ljust(35), leave=False, disable=None, **kwargs)
 
 def write_message(text):
     """Write a message that won't interfere with progress bars."""
