@@ -13,6 +13,12 @@ To run it, create a file called ``keys.py`` like this::
     PASSWORD = 'VouKOgWgS1xBiVMHtsGQD349'
     SITE = 'https://openedx.atlassian.net/wiki'
 
+or define environment variables::
+
+    CRAWL_USER = 'myemail@company.com'
+    CRAWL_PASSWORD = 'VouKOgWgS1xBiVMHtsGQD349'
+    CRAWL_SITE = 'https://openedx.atlassian.net/wiki'
+
 The PASSWORD is an API token you can get from https://id.atlassian.com/manage-profile/security/api-tokens
 
 If you wish to get visited data on your pages, you can add CLOUD_SESSION_COOKIE_TOKEN to ``keys.py`` like this::

@@ -10,7 +10,14 @@ import click
 import requests.exceptions
 from atlassian import Confluence
 
-import keys
+try:
+    import keys
+except:
+    class keys:
+        USER = os.environ["CRAWL_USER"]
+        PASSWORD = os.environ["CRAWL_PASSWORD"]
+        SITE = os.environ["CRAWL_SITE"]
+
 from get_visits import get_visits
 from htmlwriter import HtmlOutlineWriter, prep_html
 from work import prog_bar, report_http_errors, work_in_threads, write_message
@@ -625,7 +632,10 @@ PERM_SHORTHANDS = {
 def main(all_spaces, pages, visits, htmldir, space_keys, skip_largest, skip_smallest):
     if not visits:
         # Cheap way to prevent collecting visit information.
-        del keys.CLOUD_SESSION_COOKIE_TOKEN
+        try:
+            del keys.CLOUD_SESSION_COOKIE_TOKEN
+        except AttributeError:
+            pass
 
     if all_spaces:
         if space_keys:
