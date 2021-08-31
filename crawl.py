@@ -438,7 +438,7 @@ def html_for_visits(visits):
 def html_for_likes(likes):
     return f"<span class='likes'>{likes}</span>" if likes else ""
 
-def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_smallest=0):
+def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_smallest=0, visits=False):
     try:
         with open("space_sizes.json") as f:
             space_sizes = json.load(f)
@@ -488,7 +488,9 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
             writer.write("<th class='right'>Pages<th class='right'>Restricted<th class='right'>Blog Posts")
             for status in OTHER_STATUSES:
                 writer.write(f"<th class='right'>{status.title()}")
-            writer.write("<th class='right'>Visits<th class='right'>Likes<th class='right'>Last Edit")
+            if visits:
+                writer.write("<th class='right'>Visits")
+            writer.write("<th class='right'>Likes<th class='right'>Last Edit")
         writer.write("<th>Anon<th>Logged-in<th>Summary<th>Admins")
         writer.write("</tr></thead>")
         writer.write("<tbody>")
@@ -510,7 +512,8 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
                 for status in OTHER_STATUSES:
                     tdr(len(space.pages_with_status(status)))
                 space_sizes[space.key] = space.total_page_count()
-                tdr(html_for_visits(space.total_visits()))
+                if visits:
+                    tdr(html_for_visits(space.total_visits()))
                 tdr(html_for_likes(space.likes()))
                 latest_edit = space.latest_edit()
                 tdr(latest_edit.to_html() if latest_edit else "")
@@ -543,7 +546,11 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
     if do_pages:
         with open_for_writing(f"{html_dir}/all_spaces_pages.html") as fout:
             writer = HtmlOutlineWriter(fout, stylefile="style.css", title="All space pages")
-            writer.write(html="<table><thead><tr><th>Created</th><th>Last Edited</th><th>Last Edited by:</th><th>Views</th><th>Likes</th><th>Space</th><th>Type</th><th>Page</th></tr></thead>")
+            writer.write("<table><thead><tr>")
+            writer.write("<th>Created</th><th>Last Edited</th><th>Last Edited by:</th>")
+            if visits:
+                writer.write("<th>Visits</th>")
+            writer.write("<th>Likes</th><th>Space</th><th>Type</th><th>Page</th></tr></thead>")
             writer.write("<tbody>")
             for space in spaces:
                 for page in itertools.chain(space.all_pages, space.blog_posts):
@@ -553,7 +560,8 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
                     tdr(html_for_datetime(page.created.when))
                     tdr(html_for_datetime(page.lastedit.when))
                     tdl(html_for_name(page.lastedit.who))
-                    tdr(html_for_visits(page.visits))
+                    if visits:
+                        tdr(html_for_visits(page.visits))
                     tdr(html_for_likes(page.likes))
                     tdl(space.key)
                     tdl(page.type)
@@ -615,7 +623,13 @@ def main(all_spaces, pages, visits, htmldir, space_keys, skip_largest, skip_smal
         if space_keys:
             click.echo("Can't specify space keys with --all")
             return
-        generate_all_space_pages(do_pages=pages, html_dir=htmldir, skip_largest=skip_largest, skip_smallest=skip_smallest)
+        generate_all_space_pages(
+            do_pages=pages,
+            html_dir=htmldir,
+            skip_largest=skip_largest,
+            skip_smallest=skip_smallest,
+            visits=visits,
+            )
     elif space_keys:
         for space_key in space_keys:
             generate_space_page(Space(key=space_key), html_dir=htmldir)
