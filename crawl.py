@@ -482,6 +482,14 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
         total_restricted = 0
         total_posts = 0
         writer = HtmlOutlineWriter(fout, stylefile="style.css", title="All spaces")
+        if do_pages:
+            writer.write(
+                "<p>Other reports: &nbsp;" +
+                "<a href='authors.html'>By author</a>, &nbsp;" +
+                "<a href='all_spaces_pages.html'>All pages flat</a>." +
+                "</p>"
+            )
+
         writer.write("<table>")
         writer.write("<thead><tr><th>Space")
         if do_pages:
