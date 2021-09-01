@@ -484,7 +484,7 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
         writer.write(str(html))
         writer.write("</td>")
 
-    with open_for_writing(f"{html_dir}/spaces.html") as fout:
+    with open_for_writing(f"{html_dir}/index.html") as fout:
         total_pages = 0
         total_restricted = 0
         total_posts = 0

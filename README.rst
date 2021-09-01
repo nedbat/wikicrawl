@@ -33,5 +33,5 @@ Then run::
     python crawl.py --all --pages
 
 An ``html`` directory will be created here and populated with the report.  Open
-html/spaces.html to see the list of wiki spaces, each linked to a page about
+html/index.html to see the list of wiki spaces, each linked to a page about
 the pages in the space.
