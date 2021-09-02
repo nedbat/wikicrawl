@@ -163,9 +163,13 @@ class Space:
         if api_space:
             self.name = api_space.get('name')
             self.permissions = api_space.get('permissions')
+            self.status = api_space.get('status')
+            self.type = api_space.get('type')
         else:
             self.name = None
             self.permissions = None
+            self.status = None
+            self.type = None
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.key!r}>"
@@ -499,6 +503,7 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
 
         writer.write("<table>")
         writer.write("<thead><tr><th>Space")
+        writer.write("<th>Status<th>Type")
         if do_pages:
             writer.write("<th class='right'>Pages<th class='right'>Restricted<th class='right'>Blog Posts")
             for status in OTHER_STATUSES:
@@ -520,6 +525,8 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
                 title += ": " + space.name
             space_name = prep_html(text=title, href=f"pages_{space.key}.html" if do_pages else None)
             tdl(f"<span data='{order}'>{space_name}</span>")
+            tdl(space.status)
+            tdl(space.type)
             if do_pages:
                 tdr(len(space.pages))
                 tdr(num_restricted)
