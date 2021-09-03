@@ -341,8 +341,7 @@ def get_api_spaces(num_guess):
                 yield from handle_spaces(spaces)
             start = starts[-1] + chunk_size
         while True:
-            with report_http_errors():
-                spaces = confluence.get_all_spaces(limit=10, start=start, expand="permissions")
+            spaces = get_api_spaces_chunk(start)
             if spaces['size'] == 0:
                 break
             yield from handle_spaces(spaces)
