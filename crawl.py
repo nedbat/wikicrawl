@@ -318,7 +318,7 @@ def name_for_permission(p):
 
 def get_api_spaces_chunk(start):
     with report_http_errors():
-        return confluence.get_all_spaces(limit=10, start=start, expand="permissions")
+        return confluence.get_all_spaces(limit=10, start=start, expand="permissions,description.view,metadata.labels")
 
 def get_api_spaces(num_guess):
     # Not sure why spaces are repeated, but let's eliminate duplicates ourselves.
@@ -456,6 +456,9 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
         space_sizes = {}
 
     api_spaces = get_api_spaces(num_guess=len(space_sizes) or 200)
+    api_spaces = list(api_spaces)
+    with open_for_writing(f"{html_dir}/spaces.json") as f:
+        json.dump(api_spaces, f, indent=4)
     spaces = [Space(sd) for sd in api_spaces]
     for space in spaces:
         space.size = space_sizes.get(space.key, 1)
@@ -471,7 +474,7 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
         for space, num_restricted in prog_bar(work, desc="Reading spaces", total=len(spaces)):
             num_restricteds[space.key] = num_restricted
 
-    with open("space_sizes.json", "w") as f:
+    with open_for_writing("space_sizes.json") as f:
         json.dump(space_sizes, f)
 
     with open("sort.js") as sortjs:
