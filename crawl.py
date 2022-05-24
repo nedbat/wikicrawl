@@ -23,7 +23,7 @@ from htmlwriter import HtmlOutlineWriter, prep_html
 from work import prog_bar, report_http_errors, work_in_threads, write_message
 
 
-confluence = Confluence(username=keys.USER, password=keys.PASSWORD, url=keys.SITE)
+confluence = None   # will be created in main.
 
 def scrub_title(title):
     return re.sub(r"[^a-z0-9 ]", "", title.lower()).strip()
@@ -470,7 +470,9 @@ def generate_all_space_pages(do_pages, html_dir='html', skip_largest=0, skip_sma
 
     if do_pages:
         num_restricteds = {}
-        work = work_in_threads(spaces, generate_space_page, max_workers=10)
+        def f_page(space):
+            return generate_space_page(space, html_dir=html_dir)
+        work = work_in_threads(spaces, f_page, max_workers=10)
         for space, num_restricted in prog_bar(work, desc="Reading spaces", total=len(spaces)):
             num_restricteds[space.key] = num_restricted
 
@@ -637,14 +639,18 @@ PERM_SHORTHANDS = {
 @click.option('--htmldir', default='html', metavar="DIR", help="Directory to get the HTML results")
 @click.option('--skip-largest', type=int, default=0, metavar="N", help="Skip N largest spaces")
 @click.option('--skip-smallest', type=int, default=0, metavar="N", help="Skip N smallest spaces")
+@click.option('--site', type=str, metavar="URL", help="Which site to crawl")
 @click.argument('space_keys', nargs=-1)
-def main(all_spaces, pages, visits, htmldir, space_keys, skip_largest, skip_smallest):
+def main(all_spaces, pages, visits, htmldir, space_keys, skip_largest, skip_smallest, site):
     if not visits:
         # Cheap way to prevent collecting visit information.
         try:
             del keys.CLOUD_SESSION_COOKIE_TOKEN
         except AttributeError:
             pass
+
+    global confluence
+    confluence = Confluence(username=keys.USER, password=keys.PASSWORD, url=site or keys.SITE)
 
     if all_spaces:
         if space_keys:
